@@ -1,12 +1,6 @@
 package bcc
 
 import (
-	// "crypto/sha256"
-	// "encoding/hex"
-
-	// "errors"
-	// "strconv"
-	// "time"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,7 +52,7 @@ func (B *Blockchain) WriteBlockchainAt(path string) error {
 
 func (B *Blockchain) IsValid() (int, bool) {
 	bool_state := true
-	prev_hash := "1"
+	prev_hash := GENESIS_HASH
 	i := 0
 	for _, block := range *B {
 		bool_state = bool_state && block.Previous_hash == prev_hash && block.IsValid() && block.Index == i
@@ -83,19 +77,26 @@ func (B *Blockchain) MakeDB() (DBmap, error) {
 			tmp, _ := dbmap.addTransaction(&tx)
 			fee += tmp
 		}
-		validator := 0
-		dbmap.changeBalance(NodeIDArray[validator], fee)
+		validator := block.CalcValidator()
+		
+		tmp := NodeIDArray[validator]
+		if tmp == "" {
+			tmp = NodeIDArray[0]
+		}
+		fmt.Println(tmp)
+		fmt.Println(validator)
+		dbmap.changeBalance(tmp, fee)
 
 	}
 	return dbmap, nil
 }
 
 func (B *Blockchain) AddBlock(block *Block) error {
-	if _, v := B.IsValid(); v {
-		if block.Index == len(*B) {
-			*B = append(*B, *block)
-			return nil
-		}
+
+	if block.Index == len(*B) {
+		*B = append(*B, *block)
+		return nil
 	}
+
 	return errors.New("Block not valid")
 }

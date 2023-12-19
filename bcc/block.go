@@ -154,15 +154,17 @@ func (b *Block) CalcValidator() int {
 	for _, v := range NodeStakes {
 		steaks_sum += v
 	}
+
 	randomGenerator := rand.New(rand.NewSource(stringToSeed(b.Previous_hash)))
 	rng := randomGenerator.Float64()
-	fmt.Println("Rng: ", rng)
+	
 	
 	temp := 0.
 	for i := range NodeStakes {
 		NodeStakes[i] += temp
 		temp = NodeStakes[i]
 		if temp - rng >= 0 {
+			fmt.Println("Rng: ", rng, " index: ", i)
 			return i
 		}
 	}

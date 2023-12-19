@@ -167,8 +167,6 @@ func (t *Transaction) Verify() (bool) {
 	return true
 }
 
-
-
 func (t *Transaction) CalcFee() float64 {
 	if t.Sender_address == "0" || t.Receiver_address == "0" {
 		return 0

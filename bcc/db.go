@@ -72,6 +72,15 @@ func (db *DBmap) AccountExistsAdd(_account_key string, _add_if_not_exists bool) 
 
 }
 
+func (db *DBmap) IsTransactionPossible(tx *Transaction) bool {
+	if tx.Sender_address == "0" {
+		return true
+	}
+	return tx.CalcFee() + tx.Amount > (*db)[tx.Sender_address].Balance
+	
+}
+
+
 func (db *DBmap) changeBalance(_account_key string, _amount float64) error {
 	if _account_key != "0" {
 		var new_wallet WalletData = (*db)[_account_key]

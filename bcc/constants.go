@@ -8,6 +8,8 @@ const TIME_FORMAT string = "02-01-2006 15:04:05.000"
 const INITIAL_BCC float64 = 1000
 const CAPACITY int = 10
 const DB_PATH string = `C:\Users\ppapa\Desktop\go\db.json`
-const NODES int = 1
+const NODES int = 2
 const DEFAULT_STAKE float64 = 1
 const GENESIS_HASH string = "1"
+
+const BROKER_URL string = "localhost:9092"

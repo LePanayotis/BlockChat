@@ -1,6 +1,0 @@
-package bcc
-
-import (
-	//"fmt"
-)
-
