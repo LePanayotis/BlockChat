@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"os"
 	"strconv"
+
+	"github.com/segmentio/kafka-go"
 )
 
 
@@ -25,11 +27,24 @@ func StartEnv() {
 		NodeIDString = os.Args[1]
 	}
 	NodeID, _ = strconv.Atoi(NodeIDString)
-	BLOCKCHAIN_PATH = `blockchain`+`.json`
-	DB_PATH = `db`+`.json`
+	BLOCKCHAIN_PATH = `blockchain`+NodeIDString+`.json`
+	DB_PATH = `db`+NodeIDString+`.json`
 	BlockIndex = 0
 	Last_hash = GENESIS_HASH
 	NodeIDArray = make([]string, NODES)
+
+	MyPublicKey, MyPrivateKey  = GenerateKeysUpdate()
+
+	MyHeaders = []kafka.Header{
+		{
+			Key:   "NodeId",
+			Value: []byte(NodeIDString),
+		},
+		{
+			Key:   "NodeWallet",
+			Value: []byte(MyPublicKey),
+		},
+	}
 }
 
 func GenerateKeys() (string, string) {

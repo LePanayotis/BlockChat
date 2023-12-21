@@ -2,16 +2,14 @@ package bcc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/segmentio/kafka-go"
+	"log"
 	"os"
 	"strconv"
-)
 
-// var W *kafka.Writer = &kafka.Writer{
-// 	Addr:  kafka.TCP("localhost:9092"),
-// 	Topic: "my-topic",
-// }
+	"github.com/segmentio/kafka-go"
+)
 
 func SendTransaction(w *kafka.Writer, tx Transaction) error {
 	jsonString, err := tx.JSONify()
@@ -21,24 +19,15 @@ func SendTransaction(w *kafka.Writer, tx Transaction) error {
 	err = w.WriteMessages(context.Background(), kafka.Message{
 		Topic: "post-transaction",
 		Value: []byte(jsonString),
-		Headers: []kafka.Header{{
-			Key:   "SenderNode",
-			Value: []byte(strconv.Itoa(NodeID)),
-		}},
+		Headers: MyHeaders,
 	})
-
 	return err
 }
 
 func DeclareExistence(w *kafka.Writer) error {
-	byteMessage := []byte(MyPublicKey)
 	err := w.WriteMessages(context.Background(), kafka.Message{
-		Topic: "declare-self",
-		Value: byteMessage,
-		Headers: []kafka.Header{{
-			Key:   "SenderNode",
-			Value: byteMessage,
-		}},
+		Topic: "enter",
+		Headers: MyHeaders,
 	})
 	return err
 }
@@ -49,16 +38,44 @@ func BroadcastBlock(w *kafka.Writer, b Block) error {
 		return err
 	}
 	byteMessage := []byte(blockJson)
-	nodeIdBytes := []byte(strconv.Itoa(NodeID))
 	err = w.WriteMessages(context.Background(), kafka.Message{
 		Topic: "post-block",
 		Value: byteMessage,
-		Headers: []kafka.Header{{
-			Key:   "SenderNode",
-			Value: nodeIdBytes,
-		}},
+		Headers: MyHeaders,
 	})
 	return err
+}
+
+
+func BroadcastWelcome(W *kafka.Writer) error {
+	BlockIndex++
+	_prev_blockchain := MyBlockchain[len(MyBlockchain)-1].Current_hash
+	block := NewBlock(BlockIndex,_prev_blockchain)
+
+	for i := 1; i < len(NodeIDArray); i++ {
+		log.Println(i,NodeIDArray[i])
+		tx := NewTransferTransaction(MyPublicKey,NodeIDArray[i],INITIAL_BCC,myNonce,MyPrivateKey)
+		block.AddTransaction(tx)
+	}
+	block.Validator = block.CalcValidator()
+	block.CalcHash()
+
+	MyBlockchain.AddBlock(&block)
+
+	fmt.Println(block.JSONify())
+	log.Println(MyBlockchain.IsValid())
+	msg := WelcomeMessage{
+		Bc:      MyBlockchain,
+		NodesIn: NodeIDArray[:],
+	}
+	payload, _ := json.Marshal(msg)
+	MyBlockchain.WriteBlockchain()
+	W.WriteMessages(context.Background(), kafka.Message{
+		Topic: "welcome",
+		Headers: MyHeaders,
+		Value: payload,
+	})
+	return nil
 }
 
 func TransmitBlockChain(w *kafka.Writer) error {

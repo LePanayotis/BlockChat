@@ -135,6 +135,9 @@ func (b *Block) IsValid(_previous_hash string) bool {
 
 }
 
+func (b *Block) SetValidator() {
+	b.Validator = b.CalcValidator()
+}
 
 func (b *Block) CalcValidator() string {
 	var NodeStakes []float64 = make([]float64, NODES)
