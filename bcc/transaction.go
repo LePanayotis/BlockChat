@@ -156,15 +156,7 @@ func (t *Transaction) Verify() (bool) {
 	public_key, _ := x509.ParsePKCS1PublicKey(public_key_array[:])
 
 	err := rsa.VerifyPKCS1v15(public_key, crypto.SHA256, produced_hash[:], signature[:])
-
-	if err != nil {
-		fmt.Println("Signature verification failed:", err)
-		return false
-	}
-
-	fmt.Println("Signature successfully verified.")
-
-	return true
+	return err == nil
 }
 
 func (t *Transaction) CalcFee() float64 {

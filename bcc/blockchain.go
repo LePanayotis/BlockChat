@@ -9,6 +9,14 @@ import (
 
 type Blockchain []Block
 
+func (B *Blockchain) GetBlockchainBytes() []byte {
+	byteArray, err := json.Marshal(B)
+	if err != nil {
+		return nil
+	} 
+	return byteArray
+}
+
 func LoadBlockchain() (Blockchain, error) {
 	content, err := os.ReadFile(BLOCKCHAIN_PATH)
 	if err != nil {
@@ -55,7 +63,7 @@ func (B *Blockchain) IsValid() (int, bool) {
 	prev_hash := GENESIS_HASH
 	i := 0
 	for _, block := range *B {
-		bool_state = bool_state && block.Previous_hash == prev_hash && block.IsValid() && block.Index == i
+		bool_state = bool_state && block.IsValid(prev_hash) && block.Index == i
 		prev_hash = block.Current_hash
 		i++
 		if !bool_state {
@@ -77,16 +85,7 @@ func (B *Blockchain) MakeDB() (DBmap, error) {
 			tmp, _ := dbmap.addTransaction(&tx)
 			fee += tmp
 		}
-		validator := block.CalcValidator()
-		
-		tmp := NodeIDArray[validator]
-		if tmp == "" {
-			tmp = NodeIDArray[0]
-		}
-		fmt.Println(tmp)
-		fmt.Println(validator)
-		dbmap.changeBalance(tmp, fee)
-
+		dbmap.changeBalance(block.Validator, fee)
 	}
 	return dbmap, nil
 }

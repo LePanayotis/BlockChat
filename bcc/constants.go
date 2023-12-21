@@ -1,15 +1,15 @@
 package bcc
 
-const FEE_PERCENTAGE float64 = 0.03
-const COST_PER_CHAR int = 1
-const BLOCKCHAIN_PATH string = `C:\Users\ppapa\Desktop\go\blockchain.json`
-const KEY_LENGTH int = 512
-const TIME_FORMAT string = "02-01-2006 15:04:05.000"
-const INITIAL_BCC float64 = 1000
-const CAPACITY int = 10
-const DB_PATH string = `C:\Users\ppapa\Desktop\go\db.json`
-const NODES int = 2
-const DEFAULT_STAKE float64 = 1
-const GENESIS_HASH string = "1"
+var FEE_PERCENTAGE float64 = 0.03
+var COST_PER_CHAR int = 1
+var BLOCKCHAIN_PATH string
+var KEY_LENGTH int = 512
+var TIME_FORMAT string = "02-01-2006 15:04:05.000"
+var INITIAL_BCC float64 = 1000
+var CAPACITY int = 10
+var DB_PATH string
+var NODES int = 3
 
-const BROKER_URL string = "localhost:9092"
+var GENESIS_HASH string = "1"
+
+var BROKER_URL string = "host.docker.internal:9093"

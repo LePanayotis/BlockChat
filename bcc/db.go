@@ -76,10 +76,9 @@ func (db *DBmap) IsTransactionPossible(tx *Transaction) bool {
 	if tx.Sender_address == "0" {
 		return true
 	}
-	return tx.CalcFee() + tx.Amount > (*db)[tx.Sender_address].Balance
-	
-}
+	return tx.CalcFee()+tx.Amount > (*db)[tx.Sender_address].Balance
 
+}
 
 func (db *DBmap) changeBalance(_account_key string, _amount float64) error {
 	if _account_key != "0" {
@@ -112,7 +111,6 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 	db.AccountExistsAdd(tx.Receiver_address, true)
 
 	fee := tx.CalcFee()
-	fmt.Println(0 - tx.Amount - fee)
 	err := db.changeBalance(tx.Sender_address, 0-tx.Amount-fee)
 	if err == nil {
 		db.changeBalance(tx.Receiver_address, tx.Amount)
