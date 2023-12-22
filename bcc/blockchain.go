@@ -78,13 +78,15 @@ func (B *Blockchain) MakeDB() (DBmap, error) {
 	index, _ := B.IsValid()
 
 	var dbmap DBmap = make(DBmap)
-	fee := float64(0)
+	var fee float64
 	for i := 0; i < index; i++ {
 		block := (*B)[i]
+		fee = 0
 		for _, tx := range block.Transactions {
 			tmp, _ := dbmap.addTransaction(&tx)
 			fee += tmp
 		}
+		fmt.Println("Total fees:",fee)
 		dbmap.changeBalance(block.Validator, fee)
 	}
 	return dbmap, nil

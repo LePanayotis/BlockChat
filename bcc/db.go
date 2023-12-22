@@ -76,7 +76,8 @@ func (db *DBmap) IsTransactionPossible(tx *Transaction) bool {
 	if tx.Sender_address == "0" {
 		return true
 	}
-	return tx.CalcFee()+tx.Amount > (*db)[tx.Sender_address].Balance
+	fmt.Printf("Fee : %f\nBalance: %f\n>", tx.CalcFee()+tx.Amount,(*db)[tx.Sender_address].Balance )
+	return tx.CalcFee()+tx.Amount <= (*db)[tx.Sender_address].Balance
 
 }
 

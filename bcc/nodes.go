@@ -12,6 +12,8 @@ import (
 
 var MyPublicKey, MyPrivateKey string
 var MyBlockchain Blockchain
+var Current_block Block
+var Transactions_in_block int
 var NodeStartTime time.Time
 var ValidDB, TempDB DBmap
 var NodeID int = 0
@@ -91,6 +93,81 @@ func StartNode() error {
 	} else {
 		err = newNodeEnter()
 	}
+	Writer =  &kafka.Writer{
+		Addr: kafka.TCP(BROKER_URL),
+	}
+	TxConsumer = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     []string{BROKER_URL},
+		Topic:       "post-transaction",
+		StartOffset: kafka.LastOffset,
+		GroupID:     NodeIDString,
+	})
+	BlockConsumer = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     []string{BROKER_URL},
+		Topic:       "post-block",
+		StartOffset: kafka.LastOffset,
+		GroupID:     NodeIDString,
+	})
+	fmt.Println("Consumers and producers connected")
+
+	go func(){
+		_lasthash := MyBlockchain[len(MyBlockchain)-1].Current_hash
+		_index := MyBlockchain[len(MyBlockchain)-1].Index + 1
+		Current_block = NewBlock(_index, _lasthash)
+		for {
+			block, validator, err := GetNewBlock(BlockConsumer)
+			if err != nil {
+				continue
+			}
+			fmt.Printf("\n%s \n = \n %s\n>", validator, Current_block.Validator)
+			fmt.Printf("Block received\n>")
+			if Current_block.Current_hash == block.Current_hash &&  validator == Current_block.Validator {
+				MyBlockchain = append(MyBlockchain, block)
+				Current_block = NewBlock(block.Index+1, block.Current_hash)
+				fmt.Printf("\nBlock accepted\n>")
+				ValidDB, _ = MyBlockchain.MakeDB()
+				TempDB = ValidDB
+				ValidDB.WriteDB()
+				MyBlockchain.WriteBlockchain()
+				Transactions_in_block = 0
+			}
+		}
+
+
+	}()
+
+	go func(){
+		Transactions_in_block = 0
+		fmt.Println("new thread started")
+		for {
+			tx, err := GetNewTransaction(TxConsumer)
+			if err != nil {
+				continue
+			}
+			if TempDB.IsTransactionPossible(&tx) {
+				if(Transactions_in_block < CAPACITY){
+					TempDB.addTransaction(&tx)
+					Current_block.AddTransaction(tx)
+					Transactions_in_block++
+					if Transactions_in_block == CAPACITY {
+						Current_block.SetValidator()
+						Current_block.CalcHash()
+						if Current_block.Validator == MyPublicKey{
+							BroadcastBlock(Writer, Current_block)
+							fmt.Printf("\nBlock sent\n>")
+						}
+					}
+				} else {
+					fmt.Printf("\nCapacity Reached\n>")
+				}
+				
+			}
+			fmt.Printf("\nTransaction received\n>")
+		}
+	}()
 	StartCLI()
+	defer Writer.Close()
+	defer TxConsumer.Close()
+	defer BlockConsumer.Close()
 	return nil
 }

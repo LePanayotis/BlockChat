@@ -3,39 +3,38 @@ package bcc
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strconv"
-
 	"github.com/segmentio/kafka-go"
 )
 
-func GetBlockMessage(r *kafka.Reader) (Block, int, error) {
+var TxConsumer *kafka.Reader
+var BlockConsumer *kafka.Reader
+
+func GetNewBlock(r *kafka.Reader) (Block, string, error) {
 	m, err := r.ReadMessage(context.Background())
 	if err != nil {
-		return Block{}, -1, err
+		return Block{}, "", err
 	}
 	B, err := ParseBlockJSON(string(m.Value))
 	if err != nil {
-		return Block{}, -1, err
+		return Block{}, "", err
 	}
-	stringId := string(m.Headers[0].Value)
-	fmt.Println(m.Headers[0].Key)
-	node, _ := strconv.Atoi(stringId)
-	return B, node, nil
+	stringId := string(m.Headers[1].Value)
+	return B, stringId, nil
 }
 
-func GetNewTransaction(r *kafka.Reader) error {
+func GetNewTransaction(r *kafka.Reader) (Transaction, error) {
+	tx := Transaction{}
 	m , err := r.ReadMessage(context.Background())
 	if err != nil {
-		return err
+		return tx, err
 	}
-	tx, err := ParseTransactionJSON(string(m.Value))
+	tx, err = ParseTransactionJSON(string(m.Value))
 	if err != nil {
-		return err
+		return tx, err
 	}
 	if !tx.Verify() {
-		return errors.New("transaction not verified")
+		return tx, errors.New("transaction not verified")
 	}
-	return nil
+	return tx,nil
 }
 

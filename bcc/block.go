@@ -24,7 +24,7 @@ type Block struct {
 }
 
 func (b *Block) GetConcat() string {
-	s := strconv.Itoa(b.Index) + b.Timestamp + b.Validator + b.Previous_hash
+	s := strconv.Itoa(b.Index) + b.Validator + b.Previous_hash
 	for _, value := range b.Transactions {
 		s = s + value.GetConcat()
 	}
