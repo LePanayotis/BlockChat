@@ -30,6 +30,7 @@ func collectNodesInfo() error {
 		_, b := NodeMap[strPublicKey]
 		if !b {
 			fmt.Println(i,"Node", intNodeId, "in")
+			fmt.Println(strPublicKey)
 			NodeMap[strPublicKey] = intNodeId
 			NodeIDArray[intNodeId] = strPublicKey
 			i++

@@ -60,7 +60,7 @@ func SetPublicKey(_key string, _node int){
 }
 
 func IsValidPublicKey(_key string) bool {
-	return len(_key) == KEY_LENGTH || _key == "0"
+	return len(_key) == KEY_LENGTH/4 || _key == "0"
 }
 
 func GenerateKeysUpdate() (string, string) {

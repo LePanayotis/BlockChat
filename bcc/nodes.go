@@ -56,6 +56,9 @@ func newNodeEnter() error {
 		MyBlockchain = welcomeMessage.Bc
 		NodeIDArray = welcomeMessage.NodesIn[:]
 		MyBlockchain.WriteBlockchain()
+		ValidDB, _ = MyBlockchain.MakeDB()
+		TempDB = ValidDB
+		ValidDB.WriteDB()
 		break
 	}
 	go func() {
@@ -70,8 +73,6 @@ func StartNode() error {
 	NodeStartTime = time.Now()
 
 	StartEnv()
-
-	MyPublicKey, MyPrivateKey = GenerateKeysUpdate()
 
 	MyBlockchain = Blockchain{}
 
@@ -90,5 +91,6 @@ func StartNode() error {
 	} else {
 		err = newNodeEnter()
 	}
-	return err
+	StartCLI()
+	return nil
 }

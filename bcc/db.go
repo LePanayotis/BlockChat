@@ -125,3 +125,17 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 	}
 	return 0, nil
 }
+
+
+func (db *DBmap) GetBalance(_account_key string) float64 {
+	return (*db)[_account_key].Balance
+}
+
+func (db *DBmap) IncreaseNonce(_account_key string) uint {
+	if _, b := (*db)[_account_key]; !b {
+		temp := (*db)[_account_key]
+		temp.Curent_Nonce++
+		(*db)[_account_key] = temp
+	}
+	return (*db)[_account_key].Curent_Nonce
+}

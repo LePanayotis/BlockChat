@@ -7,9 +7,10 @@ import (
 	"log"
 	"os"
 	"strconv"
-
 	"github.com/segmentio/kafka-go"
 )
+
+var Writer *kafka.Writer
 
 func SendTransaction(w *kafka.Writer, tx Transaction) error {
 	jsonString, err := tx.JSONify()
@@ -62,14 +63,15 @@ func BroadcastWelcome(W *kafka.Writer) error {
 
 	MyBlockchain.AddBlock(&block)
 
-	fmt.Println(block.JSONify())
-	log.Println(MyBlockchain.IsValid())
 	msg := WelcomeMessage{
 		Bc:      MyBlockchain,
 		NodesIn: NodeIDArray[:],
 	}
 	payload, _ := json.Marshal(msg)
 	MyBlockchain.WriteBlockchain()
+	ValidDB, _ = MyBlockchain.MakeDB()
+	TempDB = ValidDB
+	ValidDB.WriteDB()
 	W.WriteMessages(context.Background(), kafka.Message{
 		Topic: "welcome",
 		Headers: MyHeaders,
