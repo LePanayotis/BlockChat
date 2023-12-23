@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/segmentio/kafka-go"
 	"log"
-	"strconv"
 	"time"
 )
 
@@ -15,14 +14,14 @@ var MyBlockchain Blockchain
 var Current_block Block
 var Transactions_in_block int
 var NodeStartTime time.Time
-var ValidDB, TempDB DBmap
-var NodeID int = 0
-var NodeIDString string = strconv.Itoa(NodeID)
+var ValidDB DBmap
+var NodeID int
+var NodeIDString string
 var BlockIndex int = 0
 var Last_hash string = GENESIS_HASH
 var NodeMap map[string]int = make(map[string]int)
 var NodeIDArray []string
-var myNonce uint = 0
+var myNonce uint = 1
 var MyHeaders []kafka.Header
 
 func newNodeEnter() error {
@@ -36,9 +35,7 @@ func newNodeEnter() error {
 		GroupID:     NodeIDString,
 	})
 	
-	DeclareExistence(W)
-
-	log.Println("My stringId is", NodeIDString)
+	declareExistence(W)
 
 	for {
 		m, err := R.ReadMessage(context.Background())
@@ -59,7 +56,6 @@ func newNodeEnter() error {
 		NodeIDArray = welcomeMessage.NodesIn[:]
 		MyBlockchain.WriteBlockchain()
 		ValidDB, _ = MyBlockchain.MakeDB()
-		TempDB = ValidDB
 		ValidDB.WriteDB()
 		break
 	}
@@ -87,7 +83,6 @@ func StartNode() error {
 		if err != nil {
 			return err
 		}
-		TempDB = ValidDB
 		err = collectNodesInfo()
 
 	} else {
@@ -108,8 +103,6 @@ func StartNode() error {
 		StartOffset: kafka.LastOffset,
 		GroupID:     NodeIDString,
 	})
-	fmt.Println("Consumers and producers connected")
-
 	go func(){
 		_lasthash := MyBlockchain[len(MyBlockchain)-1].Current_hash
 		_index := MyBlockchain[len(MyBlockchain)-1].Index + 1
@@ -119,14 +112,15 @@ func StartNode() error {
 			if err != nil {
 				continue
 			}
-			fmt.Printf("\n%s \n = \n %s\n>", validator, Current_block.Validator)
-			fmt.Printf("Block received\n>")
 			if Current_block.Current_hash == block.Current_hash &&  validator == Current_block.Validator {
 				MyBlockchain = append(MyBlockchain, block)
 				Current_block = NewBlock(block.Index+1, block.Current_hash)
-				fmt.Printf("\nBlock accepted\n>")
-				ValidDB, _ = MyBlockchain.MakeDB()
-				TempDB = ValidDB
+				fmt.Printf("Block accepted\n>")
+				fmt.Printf("Validator: %d\n>", NodeMap[validator])
+				err = ValidDB.AddBlockUndoStake(&block)
+				if err != nil {
+					fmt.Print(err)
+				}
 				ValidDB.WriteDB()
 				MyBlockchain.WriteBlockchain()
 				Transactions_in_block = 0
@@ -138,36 +132,33 @@ func StartNode() error {
 
 	go func(){
 		Transactions_in_block = 0
-		fmt.Println("new thread started")
 		for {
 			tx, err := GetNewTransaction(TxConsumer)
 			if err != nil {
 				continue
 			}
-			if TempDB.IsTransactionPossible(&tx) {
+			if ValidDB.IsTransactionPossible(&tx) {
 				if(Transactions_in_block < CAPACITY){
-					TempDB.addTransaction(&tx)
-					Current_block.AddTransaction(tx)
+					ValidDB.addTransaction(&tx)
+					Current_block.AddTransaction(&tx)
 					Transactions_in_block++
 					if Transactions_in_block == CAPACITY {
 						Current_block.SetValidator()
 						Current_block.CalcHash()
 						if Current_block.Validator == MyPublicKey{
+							Current_block.Timestamp = time.Now().UTC().Format(TIME_FORMAT)
 							BroadcastBlock(Writer, Current_block)
-							fmt.Printf("\nBlock sent\n>")
+							fmt.Printf("I broadcasted the block\n>")
 						}
 					}
 				} else {
-					fmt.Printf("\nCapacity Reached\n>")
+					fmt.Printf("Capacity Reached\n>")
 				}
 				
 			}
-			fmt.Printf("\nTransaction received\n>")
+			fmt.Printf("Transaction received\n>")
 		}
 	}()
 	StartCLI()
-	defer Writer.Close()
-	defer TxConsumer.Close()
-	defer BlockConsumer.Close()
 	return nil
 }

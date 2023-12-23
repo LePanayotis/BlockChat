@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 )
 
@@ -138,7 +137,6 @@ func (t *Transaction) Verify() (bool) {
 	if (!t.IsValid()){
 		return false
 	}
-
 	produced_hash, _ := t.GetHash()
 
 	signature, _ := hex.DecodeString(t.Signature)
@@ -168,12 +166,4 @@ func (t *Transaction) CalcFee() float64 {
 		return float64(len(t.Message)*COST_PER_CHAR)
 	}
 	return 0
-}
-
-func Test() {
-	var t Transaction
-	fmt.Printf("%+v\n", t)
-	fmt.Println(t.JSONify())
-	//fmt.Println(t.Receiver_address)
-
 }

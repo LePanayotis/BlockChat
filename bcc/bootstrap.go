@@ -1,7 +1,6 @@
 package bcc
 
 import(
-	"fmt"
 	"strconv"
 	"log"
 	"github.com/segmentio/kafka-go"
@@ -22,15 +21,12 @@ func collectNodesInfo() error {
 	for i < NODES {
 		m, err := R.ReadMessage(context.Background())
 		if err != nil {
-			fmt.Println(err)
 			continue
 		}
 		strPublicKey := string(m.Headers[1].Value)
 		intNodeId, _ := strconv.Atoi(string(m.Headers[0].Value))
 		_, b := NodeMap[strPublicKey]
 		if !b {
-			fmt.Println(i,"Node", intNodeId, "in")
-			fmt.Println(strPublicKey)
 			NodeMap[strPublicKey] = intNodeId
 			NodeIDArray[intNodeId] = strPublicKey
 			i++

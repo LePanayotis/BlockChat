@@ -12,4 +12,4 @@ var NODES int = 3
 
 const GENESIS_HASH string = "1"
 
-var BROKER_URL string = "host.docker.internal:9093"
+var BROKER_URL string

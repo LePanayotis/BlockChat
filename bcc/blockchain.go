@@ -3,7 +3,6 @@ package bcc
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 )
 
@@ -20,12 +19,10 @@ func (B *Blockchain) GetBlockchainBytes() []byte {
 func LoadBlockchain() (Blockchain, error) {
 	content, err := os.ReadFile(BLOCKCHAIN_PATH)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	var blockchain Blockchain
 	if err := json.Unmarshal(content, &blockchain); err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	_, isValid := blockchain.IsValid()
@@ -74,30 +71,23 @@ func (B *Blockchain) IsValid() (int, bool) {
 	return i, bool_state
 }
 
+
+//Need to change this
 func (B *Blockchain) MakeDB() (DBmap, error) {
 	index, _ := B.IsValid()
-
 	var dbmap DBmap = make(DBmap)
-	var fee float64
 	for i := 0; i < index; i++ {
 		block := (*B)[i]
-		fee = 0
-		for _, tx := range block.Transactions {
-			tmp, _ := dbmap.addTransaction(&tx)
-			fee += tmp
-		}
-		fmt.Println("Total fees:",fee)
-		dbmap.changeBalance(block.Validator, fee)
+		dbmap.AddBlock(&block)
 	}
 	return dbmap, nil
 }
 
-func (B *Blockchain) AddBlock(block *Block) error {
 
-	if block.Index == len(*B) {
+func (B *Blockchain) AddBlock(block *Block) error {
+	if block.IsValid((*B)[len(*B)-1].Current_hash) && block.Index == len(*B) {
 		*B = append(*B, *block)
 		return nil
 	}
-
 	return errors.New("Block not valid")
 }

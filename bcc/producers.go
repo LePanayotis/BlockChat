@@ -3,8 +3,6 @@ package bcc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"github.com/segmentio/kafka-go"
@@ -25,7 +23,7 @@ func SendTransaction(w *kafka.Writer, tx Transaction) error {
 	return err
 }
 
-func DeclareExistence(w *kafka.Writer) error {
+func declareExistence(w *kafka.Writer) error {
 	err := w.WriteMessages(context.Background(), kafka.Message{
 		Topic: "enter",
 		Headers: MyHeaders,
@@ -54,9 +52,9 @@ func BroadcastWelcome(W *kafka.Writer) error {
 	block := NewBlock(BlockIndex,_prev_blockchain)
 
 	for i := 1; i < len(NodeIDArray); i++ {
-		log.Println(i,NodeIDArray[i])
 		tx := NewTransferTransaction(MyPublicKey,NodeIDArray[i],INITIAL_BCC,myNonce,MyPrivateKey)
-		block.AddTransaction(tx)
+		block.AddTransaction(&tx)
+		myNonce++
 	}
 	block.Validator = block.CalcValidator()
 	block.CalcHash()
@@ -70,7 +68,6 @@ func BroadcastWelcome(W *kafka.Writer) error {
 	payload, _ := json.Marshal(msg)
 	MyBlockchain.WriteBlockchain()
 	ValidDB, _ = MyBlockchain.MakeDB()
-	TempDB = ValidDB
 	ValidDB.WriteDB()
 	W.WriteMessages(context.Background(), kafka.Message{
 		Topic: "welcome",
@@ -83,7 +80,7 @@ func BroadcastWelcome(W *kafka.Writer) error {
 func TransmitBlockChain(w *kafka.Writer) error {
 	content, err := os.ReadFile(BLOCKCHAIN_PATH)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 	nodeIdBytes := []byte(strconv.Itoa(NodeID))
 	err = w.WriteMessages(context.Background(), kafka.Message{

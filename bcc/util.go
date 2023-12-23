@@ -68,3 +68,9 @@ func GenerateKeysUpdate() (string, string) {
 	SetPublicKey(pub, NodeID)
 	return pub, priv
 }
+
+func closeKafka() {
+	Writer.Close()
+	TxConsumer.Close()
+	BlockConsumer.Close()
+}

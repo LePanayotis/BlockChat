@@ -26,8 +26,13 @@ func StartCLI() {
 			continue
 		}
 		switch parts[0] {
+		case "q":
+			fmt.Println("Terminating node...")
+			closeKafka()
+			os.Exit(0)
 		case "exit":
 			fmt.Println("Terminating node...")
+			closeKafka()
 			os.Exit(0)
 		case "help":
 			fmt.Println("MAY GOD HELP YOU")
@@ -55,51 +60,98 @@ func StartCLI() {
 			}
 			fmt.Printf("Account balance: %f\n", ValidDB.GetBalance(account))
 		case "stake":
+			MakeStake(parts, MyPublicKey, MyPrivateKey)
 		case "t":
-			InterpretTransaction(parts, userPubKey, userPrivKey)
+			err := InterpretTransaction(parts, userPubKey, userPrivKey)
+			if err != nil {
+				fmt.Println(err)
+			}
 		case "view":
 			fmt.Println(MyBlockchain[len(MyBlockchain)-1].JSONify())
 		default:
-			fmt.Println("Provide a valid command")
+			fmt.Println("Provide a valid command, type 'help' for more information")
 		}
 	}
 }
 
 func InterpretTransaction(_command []string, _sender_pub_key string, _sender_priv_key string) error {
 	var tx Transaction
-	if len(_command) == 3 {
-		_amount, err := strconv.ParseFloat(_command[2], 64)
+	var _receiver string
+	var _amount float64
+	var _message string = ""
+	
+	length := len(_command)
+	if length < 3 {
+		return errors.New("Wrong command format")
+	}
+	if _command[1] == "-n" {
+		if length < 4 {
+			return errors.New("Wrong command format")
+		}
+		receiver_no, err := strconv.Atoi(_command[2])
+		_receiver = NodeIDArray[receiver_no]
+		if err != nil || receiver_no > NODES-1 {
+			return errors.New("NodeID must be an integer from 0 to NODES-1")
+		}
+		if _command[3] == "-m" {
+			for _, v := range _command[4:] {
+				_message += (v + " ")
+			}
+			_message = strings.Trim(_message, " ")
+		} else {
+			_amount, err = strconv.ParseFloat(_command[3], 64)
+			if err != nil {
+				return errors.New("Amount must be float")
+			}
+		}
+	} else {
+		var err error
+		_receiver = _command[1]
+		if _command[2] == "-m" {
+			for _, v := range _command[3:] {
+				_message += (v + " ")
+			}
+			_message = strings.Trim(_message, " ")
+		} else {
+			_amount, err = strconv.ParseFloat(_command[3], 64)
+			if err != nil  {
+				return err
+			}
+		}
+	}
+	
+	if _message == "" {
+		tx = NewTransferTransaction(_sender_pub_key, _receiver, _amount, myNonce, _sender_priv_key)
+	} else {
+		tx = NewMessageTransaction(_sender_pub_key, _receiver,_message, myNonce, _sender_priv_key)
+	}
+	if !ValidDB.IsTransactionPossible(&tx) {
+		return errors.New("Transaction not possible")
+	}
+	myNonce++
+	SendTransaction(Writer, tx)
+	return nil
+}
+
+func MakeStake(_command []string, _sender_pub_key string, _sender_priv_key string) error {
+	var tx Transaction
+	if len(_command) == 2 {
+		_amount, err := strconv.ParseFloat(_command[1], 64)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
-		receiver := _command[1]
-		sender_nonce := TempDB.IncreaseNonce(_sender_pub_key)
-		tx = NewTransferTransaction(_sender_pub_key, receiver, _amount, sender_nonce, _sender_priv_key)
-		if !TempDB.IsTransactionPossible(&tx) {
+		tx = NewTransferTransaction(_sender_pub_key, "0", _amount, myNonce, _sender_priv_key)
+		if !ValidDB.IsTransactionPossible(&tx) {
 			fmt.Println("Transaction not possible")
 			return errors.New("Transaction not possible")
 
 		}
-	} else if len(_command) > 3 && _command[2] == "-m" {
-		s := ""
-		for _, v := range _command[3:] {
-			s += v
-		}
-		s = strings.Trim(s, " ")
-		receiver := _command[1]
-		sender_nonce := TempDB.IncreaseNonce(_sender_pub_key)
-		tx = NewMessageTransaction(_sender_pub_key, receiver, s, sender_nonce, _sender_priv_key)
-		if !TempDB.IsTransactionPossible(&tx) {
-			fmt.Println("Transaction not possible")
-			return errors.New("Transaction not possible")
-
-		}
-
 	} else {
 		fmt.Println("Transaction command incorrect format")
 		return nil
 	}
+	myNonce++
 	SendTransaction(Writer, tx)
 	return nil
 }

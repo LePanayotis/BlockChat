@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -24,14 +25,12 @@ type WalletData struct {
 func LoadDB() (DBmap, error) {
 	content, err := os.ReadFile(DB_PATH)
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 	db := make(DBmap)
 	if err := json.Unmarshal(content, &db); err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
-
 	return db, nil
 }
 
@@ -76,9 +75,7 @@ func (db *DBmap) IsTransactionPossible(tx *Transaction) bool {
 	if tx.Sender_address == "0" {
 		return true
 	}
-	fmt.Printf("Fee : %f\nBalance: %f\n>", tx.CalcFee()+tx.Amount,(*db)[tx.Sender_address].Balance )
 	return tx.CalcFee()+tx.Amount <= (*db)[tx.Sender_address].Balance
-
 }
 
 func (db *DBmap) changeBalance(_account_key string, _amount float64) error {
@@ -105,11 +102,20 @@ func (db *DBmap) addMessage(_account_key string, m Message) {
 }
 
 func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
-	if !tx.IsValid() {
+	if !tx.Verify() {
 		return 0, errors.New("Transaction verification failed")
 	}
 	db.AccountExistsAdd(tx.Sender_address, true)
 	db.AccountExistsAdd(tx.Receiver_address, true)
+	if tx.Sender_address != "0" {
+		if tx.Nonce == (*db)[tx.Sender_address].Curent_Nonce+1 {
+			fmt.Println("Nonce ok")
+			db.IncreaseNonce(tx.Sender_address)
+		} else {
+			fmt.Println("Nonce not ok")
+			return 0, errors.New("Transaction nonce invalid")
+		}
+	}
 
 	fee := tx.CalcFee()
 	err := db.changeBalance(tx.Sender_address, 0-tx.Amount-fee)
@@ -124,7 +130,7 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 		}
 		return fee, nil
 	}
-	return 0, nil
+	return 0, err
 }
 
 
@@ -133,10 +139,44 @@ func (db *DBmap) GetBalance(_account_key string) float64 {
 }
 
 func (db *DBmap) IncreaseNonce(_account_key string) uint {
-	if _, b := (*db)[_account_key]; !b {
+	if _, b := (*db)[_account_key]; b {
 		temp := (*db)[_account_key]
 		temp.Curent_Nonce++
 		(*db)[_account_key] = temp
+		log.Printf("My nonce is %d\n", temp.Curent_Nonce)
 	}
 	return (*db)[_account_key].Curent_Nonce
+}
+
+func (db *DBmap) GetNonce(_account_key string) uint {
+	return (*db)[_account_key].Curent_Nonce
+}
+
+func (db *DBmap) AddBlock(block *Block) error {
+	fee := float64(0)
+	for _, tx := range block.Transactions {
+		if !db.IsTransactionPossible(&tx) {
+			continue
+		}
+		if tx.Receiver_address == "0" {
+			continue
+		}
+		tmp, _ := db.addTransaction(&tx)
+		fee += tmp
+	}
+	db.changeBalance(block.Validator, fee)
+	return nil
+}
+
+func (db *DBmap) AddBlockUndoStake(block *Block) error {
+	fee := float64(0)
+	for _, tx := range block.Transactions {
+		if tx.Receiver_address == "0" {
+			db.changeBalance(tx.Sender_address, tx.Amount)
+			continue
+		}
+		fee += tx.CalcFee()
+	}
+	db.changeBalance(block.Validator, fee)
+	return nil
 }

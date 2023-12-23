@@ -5,14 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"hash/fnv"
 	"math/rand"
 	"strconv"
 	"time"
 )
-
-
 
 type Block struct {
 	Index         int
@@ -63,7 +60,6 @@ func GenesisBlock(_public_key string, _priv_key string) Block {
 }
 
 func NewBlock(_index int, _previous_hash string) Block {
-
 	b := Block{
 		Index:         _index,
 		Transactions:  nil,
@@ -71,26 +67,19 @@ func NewBlock(_index int, _previous_hash string) Block {
 		Previous_hash: _previous_hash,
 	}
 	return b
-
 }
 
 func (b *Block) CalcHash() {
-	timestamp := time.Now().UTC().Format(TIME_FORMAT)
-	b.Timestamp = timestamp
 	hash_bytes, _ := b.GetHash()
 	b.Current_hash = hex.EncodeToString(hash_bytes[:])
-
 }
 
-func (b *Block) AddTransaction(tx Transaction) (int, error) {
+func (b *Block) AddTransaction(tx *Transaction) (int, error) {
 	if !tx.Verify() {
 		return -1, errors.New("transaction verification failed")
 	}
-	if len(b.Transactions) < CAPACITY {
-		b.Transactions = append(b.Transactions, tx)
-		return len(b.Transactions), nil
-	}
-	return -1, errors.New("capacity of block reached")
+	b.Transactions = append(b.Transactions, *tx)
+	return len(b.Transactions), nil
 }
 
 func (b *Block) JSONify() (string, error) {
@@ -113,23 +102,23 @@ func ParseBlockJSON(s string) (Block, error) {
 
 }
 
-
-//to-do add check for previous hash
 func (b *Block) IsValid(_previous_hash string) bool {
-	if b.Index < 0 || b.Validator == "" || len(b.Transactions) > CAPACITY {
+	if b.Index < 0 || b.Validator == "" {
 		return false
 	}
 	temp := true
 	for _, value := range b.Transactions {
 		temp = temp && value.Verify()
-		if !temp  {break}
+		if !temp {
+			break
+		}
 	}
 	if temp {
 		_current_hash_bytes, _ := b.GetHash()
 		_current_hash := hex.EncodeToString(_current_hash_bytes[:])
 		temp = _current_hash == b.Current_hash
 		temp = temp && b.CalcValidator() == b.Validator
-		temp = temp && b.Previous_hash ==_previous_hash
+		temp = temp && b.Previous_hash == _previous_hash
 	}
 	return temp
 
@@ -156,7 +145,7 @@ func (b *Block) CalcValidator() string {
 	if stakes == 0 {
 		return NodeIDArray[0]
 	}
-	
+
 	//Calculate staking node
 	steaks_sum := 0.
 	for _, v := range NodeStakes {
@@ -164,13 +153,10 @@ func (b *Block) CalcValidator() string {
 	}
 
 	randomGenerator := rand.New(rand.NewSource(stringToSeed(b.Previous_hash)))
-	lucky := randomGenerator.Float64()*steaks_sum
-	fmt.Println(lucky)
-
+	lucky := randomGenerator.Float64() * steaks_sum
 	temp := 0.
 	for i := 0; i < NODES; i++ {
 		NodeStakes[i] += temp
-		fmt.Println(NodeStakes[i])
 		temp = NodeStakes[i]
 		if lucky < temp {
 			return NodeIDArray[i]
