@@ -55,6 +55,7 @@ func (B *Blockchain) WriteBlockchainAt(path string) error {
 	return nil
 }
 
+
 func (B *Blockchain) IsValid() (int, bool) {
 	bool_state := true
 	prev_hash := GENESIS_HASH
@@ -83,7 +84,7 @@ func (B *Blockchain) MakeDB() (DBmap, error) {
 	return dbmap, nil
 }
 
-
+//Appends valid block to blockchain
 func (B *Blockchain) AddBlock(block *Block) error {
 	if block.IsValid((*B)[len(*B)-1].Current_hash) && block.Index == len(*B) {
 		*B = append(*B, *block)

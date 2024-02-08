@@ -9,10 +9,17 @@ import (
 	"time"
 )
 
+//Node's public and private RSA keys for transactions
 var MyPublicKey, MyPrivateKey string
+
+//Node's blockchain struct
 var MyBlockchain Blockchain
+
+//Block object currently in creation
+//
 var Current_block Block
 var Transactions_in_block int
+
 var NodeStartTime time.Time
 var ValidDB DBmap
 var NodeID int
@@ -22,7 +29,9 @@ var Last_hash string = GENESIS_HASH
 var NodeMap map[string]int = make(map[string]int)
 var NodeIDArray []string
 var myNonce uint = 1
+
 var MyHeaders []kafka.Header
+
 
 func newNodeEnter() error {
 	var W *kafka.Writer = &kafka.Writer{

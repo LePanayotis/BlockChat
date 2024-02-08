@@ -7,6 +7,7 @@ import(
 	"context"
 )
 
+
 func collectNodesInfo() error {
 	R := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     []string{BROKER_URL},

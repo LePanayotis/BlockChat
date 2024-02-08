@@ -45,7 +45,7 @@ func BroadcastBlock(w *kafka.Writer, b Block) error {
 	return err
 }
 
-
+//Broadcasts the initial blockchain and the nodes array of the cluster
 func BroadcastWelcome(W *kafka.Writer) error {
 	BlockIndex++
 	_prev_blockchain := MyBlockchain[len(MyBlockchain)-1].Current_hash
@@ -76,6 +76,7 @@ func BroadcastWelcome(W *kafka.Writer) error {
 	})
 	return nil
 }
+
 
 func TransmitBlockChain(w *kafka.Writer) error {
 	content, err := os.ReadFile(BLOCKCHAIN_PATH)

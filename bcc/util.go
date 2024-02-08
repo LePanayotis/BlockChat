@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"os"
 	"strconv"
-
 	"github.com/segmentio/kafka-go"
 )
 

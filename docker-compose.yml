@@ -23,4 +23,3 @@ services:
       - NODE_ID=2
     env_file:
       - ./.env
-
