@@ -7,11 +7,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	//"github.com/spf13/cobra"
 )
+
+var userPubKey, userPrivKey string
 
 func StartCLI() {
 
-	userPubKey, userPrivKey := MyPublicKey, MyPrivateKey
+	userPubKey, userPrivKey = MyPublicKey, MyPrivateKey
 	scanner := bufio.NewScanner(os.Stdin)
 
 	fmt.Println("Welcome to the CLI, type exit to exit")

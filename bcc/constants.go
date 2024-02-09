@@ -9,7 +9,8 @@ var INITIAL_BCC float64 = 1000
 var CAPACITY int = 10
 var DB_PATH string
 var NODES int = 3
-
+const SOCKET string = ":1500"
+const PROTOCOL string ="tcp"
 const GENESIS_HASH string = "1"
 
 var BROKER_URL string

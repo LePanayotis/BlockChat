@@ -10,6 +10,11 @@ import (
 
 var Writer *kafka.Writer
 
+type WelcomeMessage struct{
+	Bc Blockchain `json:"blockchain"`
+	NodesIn []string `json:"nodesin"`	
+}
+
 func SendTransaction(w *kafka.Writer, tx Transaction) error {
 	jsonString, err := tx.JSONify()
 	if err != nil {

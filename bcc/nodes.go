@@ -29,7 +29,7 @@ var Last_hash string = GENESIS_HASH
 var NodeMap map[string]int = make(map[string]int)
 var NodeIDArray []string
 var myNonce uint = 1
-
+var CLI = false
 var MyHeaders []kafka.Header
 
 
@@ -80,7 +80,7 @@ func StartNode() error {
 	NodeStartTime = time.Now()
 
 	StartEnv()
-
+	userPubKey, userPrivKey = MyPublicKey, MyPrivateKey
 	MyBlockchain = Blockchain{}
 
 	var err error
@@ -138,7 +138,7 @@ func StartNode() error {
 
 
 	}()
-
+	go Start_rpc()
 	go func(){
 		Transactions_in_block = 0
 		for {
@@ -168,6 +168,12 @@ func StartNode() error {
 			fmt.Printf("Transaction received\n>")
 		}
 	}()
-	StartCLI()
+	if !CLI {	
+		StartCLI()
+
+	}
+	for {
+
+	}
 	return nil
 }

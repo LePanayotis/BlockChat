@@ -1,4 +1,4 @@
-module myproject
+module blockchat.io
 
 go 1.17
 
