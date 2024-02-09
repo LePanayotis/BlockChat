@@ -4,91 +4,206 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/segmentio/kafka-go"
 	"log"
+	"strconv"
 	"time"
+
+	"github.com/segmentio/kafka-go"
 )
 
-//Node's public and private RSA keys for transactions
-var MyPublicKey, MyPrivateKey string
+type NodeConfig struct {
+	feePercentage       float64 `default:"0.03"`
+	costPerChar         int     `default:"1"`
+	blockchainPath      string
+	keyLength           int     `default:"512"`
+	timeFormat          string  `default:"02-01-2006 15:04:05.000"`
+	initialBCC          float64 `default:"1000"`
+	capacity            int     `default:"3"`
+	dbPath              string
+	nodes               int    `default:"1"`
+	socket              string `default:":1500"`
+	protocol            string `default:"tcp4"`
+	genesisHash         string `default:"1"`
+	brokerURL           string `default:"localhost:9093"`
+	id                  int    `default:"0"`
+	myPublicKey         string
+	myPrivateKey        string
+	currentBlock        Block  `default:"0"`
+	transactionsInBlock int    `default:"0"`
+	blockIndex          int    `default:"0"`
+	lastHash            string `default:"1"`
+	nodeMap             map[string]int
+	nodeIdArray         []string
+	idString            string `default:"0"`
+	nodeStartTime       string
+	myHeaders           []kafka.Header
+	ready               bool `default:"false"`
+	detached            bool `default:"false"`
+	currentPublicKey    string
+	currentPrivateKey   string
+	myBlockchain        Blockchain
+	myDB                DBmap
+	writer              *kafka.Writer
+	txConsumer          *kafka.Reader
+	blockConsumer       *kafka.Reader
+}
 
-//Node's blockchain struct
-var MyBlockchain Blockchain
+var node *NodeConfig = &NodeConfig{
+	keyLength:  512,
+	timeFormat: "02-01-2006 15:04:05.000",
+	protocol:   "tcp4",
+}
 
-//Block object currently in creation
-//
-var Current_block Block
-var Transactions_in_block int
-
-var NodeStartTime time.Time
-var ValidDB DBmap
-var NodeID int
-var NodeIDString string
-var BlockIndex int = 0
-var Last_hash string = GENESIS_HASH
-var NodeMap map[string]int = make(map[string]int)
-var NodeIDArray []string
 var myNonce uint = 1
 var CLI = false
-var MyHeaders []kafka.Header
-
 
 func newNodeEnter() error {
-	var W *kafka.Writer = &kafka.Writer{
-		Addr:  kafka.TCP(BROKER_URL),
+
+	var w *kafka.Writer = &kafka.Writer{
+		Addr: kafka.TCP(node.brokerURL),
 	}
-	var R *kafka.Reader = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{BROKER_URL},
+	var r *kafka.Reader = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     []string{node.brokerURL},
 		Topic:       "welcome",
 		StartOffset: kafka.LastOffset,
-		GroupID:     NodeIDString,
+		GroupID:     node.idString,
 	})
-	
-	declareExistence(W)
+
+	declareExistence(w)
 
 	for {
-		m, err := R.ReadMessage(context.Background())
+		m, err := r.ReadMessage(context.Background())
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
-		if m.Time.Before(NodeStartTime) {
-			log.Println("Message before NodeStartTime")
+		t, _ := time.Parse(node.timeFormat, node.nodeStartTime)
+		if m.Time.Before(t) {
+			log.Println("Message before node start time")
 			continue
 		}
-		var welcomeMessage WelcomeMessage
+		var welcomeMessage welcomeMessage
 		err = json.Unmarshal(m.Value, &welcomeMessage)
 		if err != nil {
 			log.Println(err)
+			return err
 		}
-		MyBlockchain = welcomeMessage.Bc
-		NodeIDArray = welcomeMessage.NodesIn[:]
-		MyBlockchain.WriteBlockchain()
-		ValidDB, _ = MyBlockchain.MakeDB()
-		ValidDB.WriteDB()
+
+		node.myBlockchain = welcomeMessage.Bc
+		node.nodeIdArray = welcomeMessage.NodesIn[:]
+		node.myBlockchain.WriteBlockchain()
+		node.myDB, err = node.myBlockchain.MakeDB()
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		err = node.myDB.WriteDB()
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
 		break
 	}
 	go func() {
-		R.Close()
-		W.Close()
+		r.Close()
+		w.Close()
 	}()
 	return nil
 }
 
+func startEnv() {
+	node.nodeMap = make(map[string]int)
+	node.nodeIdArray = make([]string, node.nodes)
+	node.generateKeysUpdate()
+	node.nodeStartTime = time.Now().UTC().Format(node.timeFormat)
+	node.lastHash = node.genesisHash
+	node.idString = strconv.Itoa(node.id)
+
+	node.myHeaders = []kafka.Header{
+		{
+			Key:   "NodeId",
+			Value: []byte(node.idString),
+		},
+		{
+			Key:   "NodeWallet",
+			Value: []byte(node.myPublicKey),
+		},
+	}
+}
+
+func blockListener() error {
+	_lasthash := node.myBlockchain[len(node.myBlockchain)-1].Current_hash
+	_index := node.myBlockchain[len(node.myBlockchain)-1].Index + 1
+	node.currentBlock = NewBlock(_index, _lasthash)
+	for {
+		block, validator, err := getNewBlock(node.blockConsumer)
+		if err != nil {
+			continue
+		}
+		if node.currentBlock.Current_hash == block.Current_hash && validator == node.currentBlock.Validator {
+			node.myBlockchain = append(node.myBlockchain, block)
+			node.currentBlock = NewBlock(block.Index+1, block.Current_hash)
+			fmt.Printf("Block accepted\n>")
+			fmt.Printf("Validator: %d\n>", node.nodeMap[validator])
+			err = node.myDB.addBlockUndoStake(&block)
+			if err != nil {
+				fmt.Print(err)
+				return err
+			}
+			node.myDB.WriteDB()
+			node.myBlockchain.WriteBlockchain()
+			node.transactionsInBlock = 0
+		}
+	}
+}
+
+func transactionListener() error {
+	node.transactionsInBlock = 0
+	for {
+		tx, err := getNewTransaction(node.txConsumer)
+		if err != nil {
+			continue
+		}
+		fmt.Printf("Transaction received\n>")
+		if node.myDB.isTransactionPossible(&tx) {
+			if node.transactionsInBlock < node.capacity {
+				node.myDB.addTransaction(&tx)
+				node.currentBlock.AddTransaction(&tx)
+				node.transactionsInBlock++
+				if node.transactionsInBlock == node.capacity {
+					node.currentBlock.SetValidator()
+					node.currentBlock.CalcHash()
+					if node.currentBlock.Validator == node.myPublicKey {
+						node.currentBlock.Timestamp = time.Now().UTC().Format(node.timeFormat)
+						broadcastBlock(node.writer, node.currentBlock)
+						fmt.Printf("I broadcasted the block\n>")
+					}
+				}
+			} else {
+				fmt.Printf("Capacity Reached\n>")
+			}
+
+		} else {
+			fmt.Printf("Transaction not possible\n>")
+		}
+
+	}
+}
+
 func StartNode() error {
 
-	NodeStartTime = time.Now()
-
-	StartEnv()
-	userPubKey, userPrivKey = MyPublicKey, MyPrivateKey
-	MyBlockchain = Blockchain{}
+	startEnv()
 
 	var err error
-	if NodeID == 0 {
-		genesis := GenesisBlock(MyPublicKey, MyPrivateKey)
-		MyBlockchain = append(MyBlockchain, genesis)
-		MyBlockchain.WriteBlockchain()
-		//ValidDB, err = LoadDB()
+	var myBlockchain *Blockchain = &node.myBlockchain
+
+	if node.id == 0 {
+		genesis := GenesisBlock(node.myPublicKey, node.myPrivateKey)
+		*myBlockchain = append(*myBlockchain, genesis)
+		myBlockchain.WriteBlockchain()
+
 		if err != nil {
 			return err
 		}
@@ -97,83 +212,26 @@ func StartNode() error {
 	} else {
 		err = newNodeEnter()
 	}
-	Writer =  &kafka.Writer{
-		Addr: kafka.TCP(BROKER_URL),
+
+	//Start node kafka consumers and writers
+	node.writer = &kafka.Writer{
+		Addr: kafka.TCP(node.brokerURL),
 	}
-	TxConsumer = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{BROKER_URL},
+	node.txConsumer = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     []string{node.brokerURL},
 		Topic:       "post-transaction",
 		StartOffset: kafka.LastOffset,
-		GroupID:     NodeIDString,
+		GroupID:     node.idString,
 	})
-	BlockConsumer = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{BROKER_URL},
+	node.blockConsumer = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     []string{node.brokerURL},
 		Topic:       "post-block",
 		StartOffset: kafka.LastOffset,
-		GroupID:     NodeIDString,
+		GroupID:     node.idString,
 	})
-	go func(){
-		_lasthash := MyBlockchain[len(MyBlockchain)-1].Current_hash
-		_index := MyBlockchain[len(MyBlockchain)-1].Index + 1
-		Current_block = NewBlock(_index, _lasthash)
-		for {
-			block, validator, err := GetNewBlock(BlockConsumer)
-			if err != nil {
-				continue
-			}
-			if Current_block.Current_hash == block.Current_hash &&  validator == Current_block.Validator {
-				MyBlockchain = append(MyBlockchain, block)
-				Current_block = NewBlock(block.Index+1, block.Current_hash)
-				fmt.Printf("Block accepted\n>")
-				fmt.Printf("Validator: %d\n>", NodeMap[validator])
-				err = ValidDB.AddBlockUndoStake(&block)
-				if err != nil {
-					fmt.Print(err)
-				}
-				ValidDB.WriteDB()
-				MyBlockchain.WriteBlockchain()
-				Transactions_in_block = 0
-			}
-		}
 
-
-	}()
-	go Start_rpc()
-	go func(){
-		Transactions_in_block = 0
-		for {
-			tx, err := GetNewTransaction(TxConsumer)
-			if err != nil {
-				continue
-			}
-			if ValidDB.IsTransactionPossible(&tx) {
-				if(Transactions_in_block < CAPACITY){
-					ValidDB.addTransaction(&tx)
-					Current_block.AddTransaction(&tx)
-					Transactions_in_block++
-					if Transactions_in_block == CAPACITY {
-						Current_block.SetValidator()
-						Current_block.CalcHash()
-						if Current_block.Validator == MyPublicKey{
-							Current_block.Timestamp = time.Now().UTC().Format(TIME_FORMAT)
-							BroadcastBlock(Writer, Current_block)
-							fmt.Printf("I broadcasted the block\n>")
-						}
-					}
-				} else {
-					fmt.Printf("Capacity Reached\n>")
-				}
-				
-			}
-			fmt.Printf("Transaction received\n>")
-		}
-	}()
-	if !CLI {	
-		StartCLI()
-
-	}
-	for {
-
-	}
+	go blockListener()
+	go start_rpc()
+	go transactionListener()
 	return nil
 }

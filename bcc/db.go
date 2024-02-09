@@ -23,7 +23,7 @@ type WalletData struct {
 }
 
 func LoadDB() (DBmap, error) {
-	content, err := os.ReadFile(DB_PATH)
+	content, err := os.ReadFile(node.dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func LoadDB() (DBmap, error) {
 
 func (db *DBmap) WriteDB() error {
 
-	file, err := os.Create(DB_PATH)
+	file, err := os.Create(node.dbPath)
 	if err != nil {
 		return err
 	}
@@ -52,11 +52,11 @@ func (db *DBmap) WriteDB() error {
 	return nil
 }
 
-func (db *DBmap) AccountExists(_account_key string) bool {
-	return db.AccountExistsAdd(_account_key, false)
+func (db *DBmap) accountExists(_account_key string) bool {
+	return db.accountExistsAdd(_account_key, false)
 }
 
-func (db *DBmap) AccountExistsAdd(_account_key string, _add_if_not_exists bool) bool {
+func (db *DBmap) accountExistsAdd(_account_key string, _add_if_not_exists bool) bool {
 	_, exists := (*db)[_account_key]
 	if !exists && _account_key != "0" {
 		if _add_if_not_exists {
@@ -71,7 +71,7 @@ func (db *DBmap) AccountExistsAdd(_account_key string, _add_if_not_exists bool) 
 
 }
 
-func (db *DBmap) IsTransactionPossible(tx *Transaction) bool {
+func (db *DBmap) isTransactionPossible(tx *Transaction) bool {
 	if tx.Sender_address == "0" {
 		return true
 	}
@@ -105,12 +105,12 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 	if !tx.Verify() {
 		return 0, errors.New("Transaction verification failed")
 	}
-	db.AccountExistsAdd(tx.Sender_address, true)
-	db.AccountExistsAdd(tx.Receiver_address, true)
+	db.accountExistsAdd(tx.Sender_address, true)
+	db.accountExistsAdd(tx.Receiver_address, true)
 	if tx.Sender_address != "0" {
 		if tx.Nonce == (*db)[tx.Sender_address].Curent_Nonce+1 {
 			fmt.Println("Nonce ok")
-			db.IncreaseNonce(tx.Sender_address)
+			db.increaseNonce(tx.Sender_address)
 		} else {
 			fmt.Println("Nonce not ok")
 			return 0, errors.New("Transaction nonce invalid")
@@ -133,12 +133,11 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 	return 0, err
 }
 
-
-func (db *DBmap) GetBalance(_account_key string) float64 {
+func (db *DBmap) getBalance(_account_key string) float64 {
 	return (*db)[_account_key].Balance
 }
 
-func (db *DBmap) IncreaseNonce(_account_key string) uint {
+func (db *DBmap) increaseNonce(_account_key string) uint {
 	if _, b := (*db)[_account_key]; b {
 		temp := (*db)[_account_key]
 		temp.Curent_Nonce++
@@ -148,14 +147,14 @@ func (db *DBmap) IncreaseNonce(_account_key string) uint {
 	return (*db)[_account_key].Curent_Nonce
 }
 
-func (db *DBmap) GetNonce(_account_key string) uint {
+func (db *DBmap) getNonce(_account_key string) uint {
 	return (*db)[_account_key].Curent_Nonce
 }
 
-func (db *DBmap) AddBlock(block *Block) error {
+func (db *DBmap) addBlock(block *Block) error {
 	fee := float64(0)
 	for _, tx := range block.Transactions {
-		if !db.IsTransactionPossible(&tx) {
+		if !db.isTransactionPossible(&tx) {
 			continue
 		}
 		if tx.Receiver_address == "0" {
@@ -168,7 +167,7 @@ func (db *DBmap) AddBlock(block *Block) error {
 	return nil
 }
 
-func (db *DBmap) AddBlockUndoStake(block *Block) error {
+func (db *DBmap) addBlockUndoStake(block *Block) error {
 	fee := float64(0)
 	for _, tx := range block.Transactions {
 		if tx.Receiver_address == "0" {

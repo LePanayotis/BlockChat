@@ -205,9 +205,9 @@ func (t *Transaction) CalcFee() float64 {
 	if t.Sender_address == "0" || t.Receiver_address == "0" {
 		return 0
 	} else if (t.Type_of_transaction =="transfer") {
-		return t.Amount*FEE_PERCENTAGE
+		return t.Amount*node.feePercentage
 	} else if (t.Type_of_transaction =="message"){
-		return float64(len(t.Message)*COST_PER_CHAR)
+		return float64(len(t.Message)*node.costPerChar)
 	}
 	return 0
 }

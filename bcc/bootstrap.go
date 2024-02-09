@@ -1,43 +1,47 @@
 package bcc
 
-import(
-	"strconv"
-	"log"
-	"github.com/segmentio/kafka-go"
+import (
 	"context"
+	"github.com/segmentio/kafka-go"
+	"log"
+	"strconv"
 )
 
-
 func collectNodesInfo() error {
-	R := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{BROKER_URL},
+
+	r := kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     []string{node.brokerURL},
 		Topic:       "enter",
 		StartOffset: kafka.LastOffset,
-		GroupID:     NodeIDString,
+		GroupID:     node.idString,
 	})
-	var W *kafka.Writer = &kafka.Writer{
-		Addr:  kafka.TCP(BROKER_URL),
+	
+	w := &kafka.Writer{
+		Addr: kafka.TCP(node.brokerURL),
 	}
+
 	i := 1
-	for i < NODES {
-		m, err := R.ReadMessage(context.Background())
+	for i < node.nodes {
+		m, err := r.ReadMessage(context.Background())
 		if err != nil {
 			continue
 		}
+
 		strPublicKey := string(m.Headers[1].Value)
 		intNodeId, _ := strconv.Atoi(string(m.Headers[0].Value))
-		_, b := NodeMap[strPublicKey]
+		_, b := node.nodeMap[strPublicKey]
 		if !b {
-			NodeMap[strPublicKey] = intNodeId
-			NodeIDArray[intNodeId] = strPublicKey
+			node.nodeMap[strPublicKey] = intNodeId
+			node.nodeIdArray[intNodeId] = strPublicKey
 			i++
 		}
 	}
 	log.Println("All nodes in")
-	BroadcastWelcome(W)
+	
+	broadcastWelcome(w)
 	go func() {
-		W.Close()
-		R.Close()
+		w.Close()
+		r.Close()
 	}()
 	return nil
 }

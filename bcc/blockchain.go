@@ -12,12 +12,12 @@ func (B *Blockchain) GetBlockchainBytes() []byte {
 	byteArray, err := json.Marshal(B)
 	if err != nil {
 		return nil
-	} 
+	}
 	return byteArray
 }
 
 func LoadBlockchain() (Blockchain, error) {
-	content, err := os.ReadFile(BLOCKCHAIN_PATH)
+	content, err := os.ReadFile(node.blockchainPath)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func LoadBlockchain() (Blockchain, error) {
 }
 
 func (B *Blockchain) WriteBlockchain() error {
-	return B.WriteBlockchainAt(BLOCKCHAIN_PATH)
+	return B.WriteBlockchainAt(node.blockchainPath)
 }
 
 func (B *Blockchain) WriteBlockchainAt(path string) error {
@@ -55,10 +55,9 @@ func (B *Blockchain) WriteBlockchainAt(path string) error {
 	return nil
 }
 
-
 func (B *Blockchain) IsValid() (int, bool) {
 	bool_state := true
-	prev_hash := GENESIS_HASH
+	prev_hash := node.genesisHash
 	i := 0
 	for _, block := range *B {
 		bool_state = bool_state && block.IsValid(prev_hash) && block.Index == i
@@ -72,19 +71,18 @@ func (B *Blockchain) IsValid() (int, bool) {
 	return i, bool_state
 }
 
-
-//Need to change this
+// Need to change this
 func (B *Blockchain) MakeDB() (DBmap, error) {
 	index, _ := B.IsValid()
 	var dbmap DBmap = make(DBmap)
 	for i := 0; i < index; i++ {
 		block := (*B)[i]
-		dbmap.AddBlock(&block)
+		dbmap.addBlock(&block)
 	}
 	return dbmap, nil
 }
 
-//Appends valid block to blockchain
+// Appends valid block to blockchain
 func (B *Blockchain) AddBlock(block *Block) error {
 	if block.IsValid((*B)[len(*B)-1].Current_hash) && block.Index == len(*B) {
 		*B = append(*B, *block)
