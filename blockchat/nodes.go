@@ -12,7 +12,7 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-type NodeConfig struct {
+type nodeConfig struct {
 	feePercentage       float64 `default:"0.03"`
 	costPerChar         int     `default:"1"`
 	blockchainPath      string
@@ -48,7 +48,7 @@ type NodeConfig struct {
 }
 
 // Necessary configuration for the module
-var node *NodeConfig = &NodeConfig{
+var node *nodeConfig = &nodeConfig{
 	keyLength:           512,
 	timeFormat:          "02-01-2006 15:04:05.000",
 	feePercentage:       0.03,
@@ -59,7 +59,7 @@ var node *NodeConfig = &NodeConfig{
 	dbPath:              "db.json",
 	nodes:               1,
 	socket:              ":1500",
-	protocol:            "tcp4",
+	protocol:            "tcp",
 	genesisHash:         "1",
 	brokerURL:           "localhost:9093",
 	id:                  0,
@@ -69,7 +69,7 @@ var node *NodeConfig = &NodeConfig{
 	idString:            "0",
 }
 
-func (node *NodeConfig) EnvironmentConfig() error {
+func (node *nodeConfig) EnvironmentConfig() error {
 	var err error
 	v, found := os.LookupEnv("BROKER_URL")
 	if found && v != "" {
@@ -382,7 +382,7 @@ func StartNode() error {
 	})
 
 	go blockListener()
-	go start_rpc()
+	go startRPC()
 	transactionListener()
 	return nil
 }

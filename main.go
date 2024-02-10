@@ -7,13 +7,11 @@ import (
 )
 
 func main() {
-
 	godotenv.Load()
 	rootCmd := blockchat.RootCmd
-	blockchat.SetStartFlags()
-
-
+	blockchat.ConfigApp()
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+
 }

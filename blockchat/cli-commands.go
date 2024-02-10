@@ -12,7 +12,7 @@ var isMessage bool
 var messagePayload string
 var toNode int
 
-var TransactionCmd = &cobra.Command{
+var transactionCmd = &cobra.Command{
 	Use:     "transaction",
 	Aliases: []string{"t"},
 	Short:   "Sends new transaction",
@@ -71,7 +71,7 @@ var TransactionCmd = &cobra.Command{
 	},
 }
 
-var BalanceCmd = &cobra.Command{
+var balanceCmd = &cobra.Command{
 	Use:   "balance",
 	Args:  cobra.NoArgs,
 	Short: "Returns the current balance in BlockChatCoins",
@@ -94,7 +94,7 @@ var BalanceCmd = &cobra.Command{
 	},
 }
 
-var GenerateWalletCmd = &cobra.Command{
+var generateWalletCmd = &cobra.Command{
 	Use:     "generate-wallet",
 	Aliases: []string{"gw"},
 	Short:   "Returns a new pair of Public and Private Keys",
@@ -115,7 +115,7 @@ var GenerateWalletCmd = &cobra.Command{
 	},
 }
 
-var UseNodeWalletCmd = &cobra.Command{
+var useNodeWalletCmd = &cobra.Command{
 	Use:     "use-node-wallet",
 	Aliases: []string{"unw"},
 	Short:   "Uses the node's wallet",
@@ -135,7 +135,7 @@ var UseNodeWalletCmd = &cobra.Command{
 	},
 }
 
-var PrintWalletCmd = &cobra.Command{
+var printWalletCmd = &cobra.Command{
 	Use:     "print-wallet",
 	Aliases: []string{"pcw"},
 	Short:   "Returns the current wallet used by the daemon",
@@ -157,7 +157,7 @@ var PrintWalletCmd = &cobra.Command{
 	},
 }
 
-var UseWalletCmd = &cobra.Command{
+var useWalletCmd = &cobra.Command{
 	Use:     "use-wallet",
 	Args:    cobra.NoArgs,
 	Aliases: []string{"uw"},
@@ -184,7 +184,7 @@ var UseWalletCmd = &cobra.Command{
 	},
 }
 
-var StakeCmd = &cobra.Command{
+var stakeCmd = &cobra.Command{
 	Use:   "stake",
 	Args:  cobra.ExactArgs(1),
 	Short: "Stakes ammount",
@@ -220,7 +220,7 @@ var StakeCmd = &cobra.Command{
 }
 
 // to add
-var ShowBlockchain = &cobra.Command{
+var showBlockchain = &cobra.Command{
 	Use:     "show-blockchain",
 	Args:    cobra.NoArgs,
 	Aliases: []string{"blockchain", "bc"},
@@ -230,7 +230,7 @@ var ShowBlockchain = &cobra.Command{
 	},
 }
 
-var StopCmd = &cobra.Command{
+var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Args:  cobra.NoArgs,
 	Short: "Stopping running process",
@@ -251,7 +251,7 @@ var StopCmd = &cobra.Command{
 	},
 }
 
-var StartCmd = &cobra.Command{
+var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Starts the node",
 	Args:  cobra.NoArgs,
@@ -262,17 +262,17 @@ var StartCmd = &cobra.Command{
 }
 
 
-var CommandSet []*cobra.Command = []*cobra.Command{
-	StartCmd,
-	BalanceCmd,
-	GenerateWalletCmd,
-	ShowBlockchain,
-	StopCmd,
-	StakeCmd,
-	TransactionCmd,
-	PrintWalletCmd,
-	UseNodeWalletCmd,
-	UseWalletCmd,
+var commandSet []*cobra.Command = []*cobra.Command{
+	startCmd,
+	balanceCmd,
+	generateWalletCmd,
+	showBlockchain,
+	stopCmd,
+	stakeCmd,
+	transactionCmd,
+	printWalletCmd,
+	useNodeWalletCmd,
+	useWalletCmd,
 }
 
 var RootCmd = &cobra.Command{
@@ -284,35 +284,33 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-func SetStartFlags() {
-	// StartCmd.Flags().IntVarP(&node.id, "node-id","n", 0, "The node id")
-	// StartCmd.Flags().StringVarP(&node.socket, "socket", "s", ":1500", "The tcp socket to connect to")
-	// StartCmd.Flags().StringVarP(&node.protocol, "protocol","p", "tcp", "The socket protocol")
-	// StartCmd.Flags().IntVarP(&node.capacity, "capacity", "c", 3, "The block capacity")
-	// StartCmd.Flags().IntVar(&node.costPerChar, "cost-per-char", 1, "The cost per character of messages")
-	// StartCmd.Flags().Float64VarP(&node.feePercentage, "fee", "f", 0.03, "The fee percentage written like 0.03")
-	// StartCmd.Flags().StringVar(&node.blockchainPath, "blockchain-path", "blockchain.json", "The path of the blockchain's json file")
-	// StartCmd.Flags().StringVar(&node.dbPath, "database-path", "db.json", "The path of the blockchain's json file")
-	// StartCmd.Flags().StringVar(&node.genesisHash, "genesis-hash", "1", "The hash of the Genesis Block")
-	// StartCmd.Flags().Float64VarP(&node.initialBCC, "initial-bcc", "b", 1000, "The initial BCC per node")
-	// StartCmd.Flags().StringVarP(&node.brokerURL, "broker-url", "k", "localhost:9093", "The adress and port of the kafka broker")
-	// StartCmd.Flags().IntVarP(&node.nodes, "nodes", "N", 1, "The number of nodes")
-	// StartCmd.MarkFlagRequired("node-id")
+func ConfigApp() {
+	node.EnvironmentConfig()
 
+	startCmd.Flags().IntVarP(&node.id, "node-id","n", node.id, "The node id")
+	startCmd.Flags().IntVarP(&node.capacity, "capacity", "c", node.capacity, "The block capacity")
+	startCmd.Flags().IntVar(&node.costPerChar, "cost-per-char", node.costPerChar, "The cost per character of messages")
+	startCmd.Flags().Float64VarP(&node.feePercentage, "fee", "f", node.feePercentage, "The fee percentage written like 0.03")
+	startCmd.Flags().StringVar(&node.blockchainPath, "blockchain-path", node.blockchainPath, "The path of the blockchain's json file")
+	startCmd.Flags().StringVar(&node.dbPath, "database-path", node.dbPath, "The path of the blockchain's json file")
+	startCmd.Flags().StringVar(&node.genesisHash, "genesis-hash", node.genesisHash, "The hash of the Genesis Block")
+	startCmd.Flags().Float64VarP(&node.initialBCC, "initial-bcc", "b", node.initialBCC, "The initial BCC per node")
+	startCmd.Flags().StringVarP(&node.brokerURL, "broker-url", "k", node.brokerURL, "The adress and port of the kafka broker")
+	startCmd.Flags().IntVarP(&node.nodes, "nodes", "N", node.nodes, "The number of nodes")
 
-	UseWalletCmd.Flags().StringVar(&_input_pub_key, "public-key", "", "Public key of the wallet")
-	UseWalletCmd.Flags().StringVar(&_input_priv_key, "private-key", "", "Private key of the RSA key pair of the wallet")
-	UseWalletCmd.MarkFlagRequired("public-key")
-	UseWalletCmd.MarkFlagRequired("private-key")
+	useWalletCmd.Flags().StringVar(&_input_pub_key, "public-key", "", "Public key of the wallet")
+	useWalletCmd.Flags().StringVar(&_input_priv_key, "private-key", "", "Private key of the RSA key pair of the wallet")
+	useWalletCmd.MarkFlagRequired("public-key")
+	useWalletCmd.MarkFlagRequired("private-key")
 
-	TransactionCmd.Flags().StringVarP(&messagePayload, "message", "m", "", "If this flag exist, the transaction is a message")
-	TransactionCmd.Flags().IntVarP(&toNode,"node", "n", -1, "Transaction with receiver the wallet of the indicated node")
+	transactionCmd.Flags().StringVarP(&messagePayload, "message", "m", "", "If this flag exist, the transaction is a message")
+	transactionCmd.Flags().IntVarP(&toNode,"recipient-node", "r", -1, "Transaction with receiver the wallet of the indicated node")
 
-	for _, cmd := range CommandSet {
-		//cmd.Flags().StringVarP(&node.socket, "socket", "s", ":1500", "The tcp socket to connect to")
-		//cmd.Flags().StringVarP(&node.protocol, "protocol","p", "tcp", "The socket protocol")
+	for _, cmd := range commandSet {
+		cmd.Flags().StringVarP(&node.socket, "socket", "s", node.socket, "The tcp socket to connect to")
+		cmd.Flags().StringVarP(&node.protocol, "protocol","p", node.protocol, "The socket protocol")
 
 		RootCmd.AddCommand(cmd)
 	}
-	node.EnvironmentConfig()
+
 }

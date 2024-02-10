@@ -77,7 +77,7 @@ func (p *RPC) Balance(_ struct{}, reply *float64) error {
 
 func (p *RPC) GenerateWallet(_ struct{}, reply *WalletArgs) error {
 	logger.Info("GenerateWallet RPC called")
-	_public, _private := GenerateKeys()
+	_public, _private := generateKeys()
 
 	(*reply).PublicKey = _public
 	(*reply).PrivateKey = _private
@@ -109,7 +109,7 @@ func (p *RPC) UseWallet(wallet *WalletArgs, reply *error) error {
 	return nil
 }
 
-func start_rpc() error{
+func startRPC() error{
 	myrpc := new(RPC)
 
 	rpc.Register(myrpc)
