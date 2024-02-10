@@ -1,4 +1,4 @@
-package bcc
+package blockchat
 
 import (
 	"net"
@@ -58,11 +58,12 @@ func (p *RPC) Stake(args *TransactionArgs, reply *error) error {
 
 func (p *RPC) Stop(_ struct{}, reply *error) error {
 	logger.Info("Stop RPC called")
-	closeKafka()
+	
 	go func() {
 		logger.Info("Node will stop in 500ms")
 		time.Sleep(time.Millisecond*500)
 		logger.Info("Node is stopping")
+		closeKafka()
 		os.Exit(1)
 	}()
 	return nil

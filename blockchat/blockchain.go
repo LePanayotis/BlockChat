@@ -1,4 +1,4 @@
-package bcc
+package blockchat
 
 import (
 	"encoding/json"

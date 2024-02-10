@@ -1,4 +1,4 @@
-package bcc
+package blockchat
 
 import (
 	"encoding/json"
@@ -106,11 +106,12 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 	db.accountExistsAdd(tx.Sender_address, true)
 	db.accountExistsAdd(tx.Receiver_address, true)
 	if tx.Sender_address != "0" {
-		if tx.Nonce == (*db)[tx.Sender_address].Curent_Nonce+1 {
-			db.increaseNonce(tx.Sender_address)
-		} else {
-			return 0, errors.New("Transaction nonce invalid")
-		}
+		db.increaseNonce(tx.Sender_address)
+		// if tx.Nonce == (*db)[tx.Sender_address].Curent_Nonce+1 {
+			
+		// } else {
+		// 	return 0, errors.New("Transaction nonce invalid")
+		// }
 	}
 
 	fee := tx.CalcFee()
