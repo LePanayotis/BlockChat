@@ -63,6 +63,7 @@ func broadcastWelcome(W *kafka.Writer) error {
 		block.AddTransaction(&tx)
 		myNonce++
 	}
+	
 	block.Validator = block.CalcValidator()
 	block.CalcHash()
 

@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
-
 	"blockchat.io/bcc"
 	"github.com/spf13/cobra"
 )
@@ -31,7 +29,6 @@ func main() {
 		bcc.PrintWalletCmd,
 		bcc.UseNodeWalletCmd,
 		bcc.UseWalletCmd,
-		bcc.TempCmd,
 	)
 	bcc.SetStartFlags()
 

@@ -1,10 +1,10 @@
 package bcc
 
 import (
-	"fmt"
 	"net"
 	"net/rpc"
 	"os"
+	"time"
 )
 
 type RPC struct{}
@@ -23,7 +23,7 @@ type WalletArgs struct {
 }
 
 func (p *RPC) Create_transaction(args *TransactionArgs, reply *error) error{
-
+	logger.Info("Create_transaction RPC called")
 	var tx Transaction
 	var receiver_address string
 	if args.ToNode > -1 && args.ToNode < node.nodes {
@@ -39,29 +39,43 @@ func (p *RPC) Create_transaction(args *TransactionArgs, reply *error) error{
 	myNonce++
 
 	*reply = sendTransaction(node.writer, tx)
-	return nil
+	if *reply != nil {
+		logger.Error("Failed to send transaction",*reply)
+	}
+	return *reply
 }
 
 func (p *RPC) Stake(args *TransactionArgs, reply *error) error {
+	logger.Info("Stake RPC called")
 	var tx Transaction = NewTransferTransaction(node.currentPublicKey, "0", args.Amount, myNonce, node.currentPrivateKey)
 	myNonce++
-	sendTransaction(node.writer, tx)
-	return nil
+	*reply = sendTransaction(node.writer, tx)
+	if *reply != nil {
+		logger.Error("Failed to send transaction",*reply)
+	}
+	return *reply
 }
 
 func (p *RPC) Stop(_ struct{}, reply *error) error {
-	fmt.Println("Exiting...called by CLI")
+	logger.Info("Stop RPC called")
 	closeKafka()
-	go os.Exit(1)
+	go func() {
+		logger.Info("Node will stop in 500ms")
+		time.Sleep(time.Millisecond*500)
+		logger.Info("Node is stopping")
+		os.Exit(1)
+	}()
 	return nil
 }
 
 func (p *RPC) Balance(_ struct{}, reply *float64) error {
+	logger.Info("Balance RPC called")
 	*reply = node.myDB.getBalance(node.currentPublicKey)
 	return nil
 }
 
 func (p *RPC) GenerateWallet(_ struct{}, reply *WalletArgs) error {
+	logger.Info("GenerateWallet RPC called")
 	_public, _private := GenerateKeys()
 
 	(*reply).PublicKey = _public
@@ -71,6 +85,8 @@ func (p *RPC) GenerateWallet(_ struct{}, reply *WalletArgs) error {
 }
 
 func (p *RPC) UseNodeWallet(_ struct{}, reply *error) error {
+
+	logger.Info("UseNodeWallet RPC called")
 	*reply = nil
 	node.currentPublicKey = node.myPublicKey
 	node.currentPrivateKey = node.myPrivateKey
@@ -78,38 +94,40 @@ func (p *RPC) UseNodeWallet(_ struct{}, reply *error) error {
 }
 
 func (p *RPC) PrintWallet(_ struct{}, reply *string) error {
+	logger.Info("PrintWallet RPC called")
 	*reply = node.currentPublicKey
 
 	return nil
 }
 
 func (p *RPC) UseWallet(wallet *WalletArgs, reply *error) error {
+	logger.Info("UseWallet RPC called")
 	node.currentPublicKey = wallet.PublicKey
 	node.currentPrivateKey = wallet.PrivateKey
 
 	return nil
 }
 
-func start_rpc() {
+func start_rpc() error{
 	myrpc := new(RPC)
 
 	rpc.Register(myrpc)
 
 	listener, err := net.Listen(node.protocol, node.socket)
 	if err != nil {
-		fmt.Println("Error starting listener:", err)
-		return
+		logger.Error("Error starting listener:", err)
+		return err
 	}
 
-	fmt.Println("Server listening on named socket")
+	logger.Info("Server listening protocol: "+node.protocol+" at socket: "+node.socket)
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Error accepting connection:", err)
+			logger.Error("Error accepting connection:", err)
 			continue
 		}
 		// Start a new goroutine to handle each incoming connection
-		rpc.ServeConn(conn)
+		go rpc.ServeConn(conn)
 	}
 
 }

@@ -3,11 +3,9 @@ package bcc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"log"
 	"strconv"
 	"time"
-
+	"log/slog"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -35,7 +33,7 @@ type NodeConfig struct {
 	nodeMap             map[string]int
 	nodeIdArray         []string
 	idString            string `default:"0"`
-	nodeStartTime       string
+	startTime       string
 	myHeaders           []kafka.Header
 	ready               bool `default:"false"`
 	detached            bool `default:"false"`
@@ -51,11 +49,12 @@ type NodeConfig struct {
 var node *NodeConfig = &NodeConfig{
 	keyLength:  512,
 	timeFormat: "02-01-2006 15:04:05.000",
-	protocol:   "tcp4",
 }
 
 var myNonce uint = 1
-var CLI = false
+
+var logger *slog.Logger = &slog.Logger{}
+
 
 func newNodeEnter() error {
 
@@ -68,56 +67,83 @@ func newNodeEnter() error {
 		StartOffset: kafka.LastOffset,
 		GroupID:     node.idString,
 	})
-
-	declareExistence(w)
+	
+	logger.Info("Kafka producer and welcome consumer connected")
+	
+	err := declareExistence(w)
+	if err != nil {
+		logger.Error("Could not declare existence to other nodes",err)
+		return err
+	}
+	
+	logger.Info("Broadcasted existence to other nodes")
 
 	for {
 		m, err := r.ReadMessage(context.Background())
 		if err != nil {
-			fmt.Println(err)
+			logger.Error("Node could not get welcome message",err)
 			continue
 		}
-		t, _ := time.Parse(node.timeFormat, node.nodeStartTime)
+		logger.Info("Received welcome message")
+
+
+		t, _ := time.Parse(node.timeFormat, node.startTime)
 		if m.Time.Before(t) {
-			log.Println("Message before node start time")
+			logger.Error("Received messages created before: "+node.startTime, err)
 			continue
 		}
+		
 		var welcomeMessage welcomeMessage
 		err = json.Unmarshal(m.Value, &welcomeMessage)
 		if err != nil {
-			log.Println(err)
+			logger.Error("Parsing welcome message failed",err)
 			return err
 		}
+		logger.Info("Successfully parsed welcome message")
 
 		node.myBlockchain = welcomeMessage.Bc
 		node.nodeIdArray = welcomeMessage.NodesIn[:]
+
+		
 		node.myBlockchain.WriteBlockchain()
-		node.myDB, err = node.myBlockchain.MakeDB()
 		if err != nil {
-			log.Println(err)
+			logger.Error("Could not write blockchain",err)
 			return err
 		}
+		logger.Info("Successfully wrote blockchain to file")
+
+		node.myDB, err = node.myBlockchain.MakeDB()
+		if err != nil {
+			logger.Error("Creating database from blockchain failed",err)
+			return err
+		}
+		logger.Info("Successfully created database")
 
 		err = node.myDB.WriteDB()
 		if err != nil {
-			log.Println(err)
+			logger.Error("Could not write database to file",err)
 			return err
 		}
+		logger.Info("Successfully stored database in file")
 
 		break
 	}
+	
 	go func() {
 		r.Close()
 		w.Close()
+		logger.Info("Successfully stored database in file")
 	}()
 	return nil
 }
 
 func startEnv() {
+	logger = slog.Default()
+	logger.Info("Starting configuring node")
 	node.nodeMap = make(map[string]int)
 	node.nodeIdArray = make([]string, node.nodes)
 	node.generateKeysUpdate()
-	node.nodeStartTime = time.Now().UTC().Format(node.timeFormat)
+	node.startTime = time.Now().UTC().Format(node.timeFormat)
 	node.lastHash = node.genesisHash
 	node.idString = strconv.Itoa(node.id)
 
@@ -134,27 +160,50 @@ func startEnv() {
 }
 
 func blockListener() error {
+	
+
 	_lasthash := node.myBlockchain[len(node.myBlockchain)-1].Current_hash
+
 	_index := node.myBlockchain[len(node.myBlockchain)-1].Index + 1
+
 	node.currentBlock = NewBlock(_index, _lasthash)
+
 	for {
 		block, validator, err := getNewBlock(node.blockConsumer)
 		if err != nil {
+			logger.Error("Error receiving block", err)
 			continue
 		}
+		logger.Info("Received new block")
+
 		if node.currentBlock.Current_hash == block.Current_hash && validator == node.currentBlock.Validator {
+
 			node.myBlockchain = append(node.myBlockchain, block)
 			node.currentBlock = NewBlock(block.Index+1, block.Current_hash)
-			fmt.Printf("Block accepted\n>")
-			fmt.Printf("Validator: %d\n>", node.nodeMap[validator])
+			
+			logger.Info("New block accepted","validator node:", node.nodeMap[validator])
+
+
 			err = node.myDB.addBlockUndoStake(&block)
 			if err != nil {
-				fmt.Print(err)
+				logger.Error("Failed adding block to database",err)
 				return err
 			}
-			node.myDB.WriteDB()
-			node.myBlockchain.WriteBlockchain()
+
+			err = node.myDB.WriteDB()
+			if err != nil {
+				logger.Error("Failed writing database",err)
+				return err
+			}
+			err = node.myBlockchain.WriteBlockchain()
+			if err != nil {
+				logger.Error("Failed writing blockchain",err)
+				return err
+			}
 			node.transactionsInBlock = 0
+
+			logger.Info("Block add routine completed")
+
 		}
 	}
 }
@@ -164,53 +213,95 @@ func transactionListener() error {
 	for {
 		tx, err := getNewTransaction(node.txConsumer)
 		if err != nil {
+			logger.Error("Failed getting transaction",err)
 			continue
 		}
-		fmt.Printf("Transaction received\n>")
+
+		logger.Info("New ransaction received")
+		
 		if node.myDB.isTransactionPossible(&tx) {
 			if node.transactionsInBlock < node.capacity {
-				node.myDB.addTransaction(&tx)
-				node.currentBlock.AddTransaction(&tx)
+
+				_, err = node.myDB.addTransaction(&tx)
+				if err != nil {
+					logger.Error("Failed adding transaction to database",err)
+					return err
+				}
+				logger.Info("Transaction added to database")
+
+				_, err = node.currentBlock.AddTransaction(&tx)
+				if err != nil {
+					logger.Error("Failed adding transaction to current Block",err)
+					return err
+				}
+
 				node.transactionsInBlock++
+				
+				
 				if node.transactionsInBlock == node.capacity {
+					logger.Info("Block capacity reached")
+					
 					node.currentBlock.SetValidator()
+
 					node.currentBlock.CalcHash()
+
 					if node.currentBlock.Validator == node.myPublicKey {
+						logger.Info("The node is broadcaster")
 						node.currentBlock.Timestamp = time.Now().UTC().Format(node.timeFormat)
-						broadcastBlock(node.writer, node.currentBlock)
-						fmt.Printf("I broadcasted the block\n>")
+						err = broadcastBlock(node.writer, node.currentBlock)
+						if err != nil {
+							logger.Error("Failed to broadcast new block", err)
+							return err
+						}
+
+						logger.Info("Block broadcasted by me")
 					}
 				}
 			} else {
-				fmt.Printf("Capacity Reached\n>")
+				logger.Warn("Capacity Reached")
 			}
 
 		} else {
-			fmt.Printf("Transaction not possible\n>")
+			logger.Error("Transaction rejected")
 		}
+
 
 	}
 }
 
 func StartNode() error {
-
 	startEnv()
 
 	var err error
 	var myBlockchain *Blockchain = &node.myBlockchain
 
 	if node.id == 0 {
+		logger.Info("Node is bootstrap node")
 		genesis := GenesisBlock(node.myPublicKey, node.myPrivateKey)
+		
+		logger.Info("Genesis block created")
 		*myBlockchain = append(*myBlockchain, genesis)
-		myBlockchain.WriteBlockchain()
-
+		
+		err = myBlockchain.WriteBlockchain()
 		if err != nil {
+			logger.Error("Could not write genesis blockchain", err)
 			return err
 		}
+		logger.Info("Blockchain written successfully")
+
 		err = collectNodesInfo()
+		if err != nil { 
+			logger.Error("Could not collect nodes info", err)
+		}
+
 
 	} else {
+		logger.Info("Node is ordinary")
 		err = newNodeEnter()
+		if err != nil {
+			logger.Error("Could not enter the cluster", err)
+			return err
+		}
 	}
 
 	//Start node kafka consumers and writers
@@ -232,6 +323,6 @@ func StartNode() error {
 
 	go blockListener()
 	go start_rpc()
-	go transactionListener()
+	transactionListener()
 	return nil
 }

@@ -3,7 +3,6 @@ package bcc
 import (
 	"context"
 	"github.com/segmentio/kafka-go"
-	"log"
 	"strconv"
 )
 
@@ -36,8 +35,6 @@ func collectNodesInfo() error {
 			i++
 		}
 	}
-	log.Println("All nodes in")
-	
 	broadcastWelcome(w)
 	go func() {
 		w.Close()

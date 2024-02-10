@@ -1,6 +1,6 @@
 module blockchat.io
 
-go 1.17
+go 1.22
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

@@ -3,8 +3,6 @@ package bcc
 import (
 	"context"
 	"errors"
-	"fmt"
-
 	"github.com/segmentio/kafka-go"
 )
 
@@ -28,7 +26,6 @@ func getNewTransaction(r *kafka.Reader) (Transaction, error) {
 	if err != nil {
 		return tx, err
 	}
-	fmt.Println(string(m.Value))
 	tx, err = ParseTransactionJSON(string(m.Value))
 	if err != nil {
 		return tx, err

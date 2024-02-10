@@ -3,8 +3,6 @@ package bcc
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"log"
 	"os"
 )
 
@@ -109,10 +107,8 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 	db.accountExistsAdd(tx.Receiver_address, true)
 	if tx.Sender_address != "0" {
 		if tx.Nonce == (*db)[tx.Sender_address].Curent_Nonce+1 {
-			fmt.Println("Nonce ok")
 			db.increaseNonce(tx.Sender_address)
 		} else {
-			fmt.Println("Nonce not ok")
 			return 0, errors.New("Transaction nonce invalid")
 		}
 	}
@@ -142,7 +138,6 @@ func (db *DBmap) increaseNonce(_account_key string) uint {
 		temp := (*db)[_account_key]
 		temp.Curent_Nonce++
 		(*db)[_account_key] = temp
-		log.Printf("My nonce is %d\n", temp.Curent_Nonce)
 	}
 	return (*db)[_account_key].Curent_Nonce
 }

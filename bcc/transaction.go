@@ -123,7 +123,10 @@ func newTransactionInstance(_Sender_address string, _Receiver_address string,
 	t.Nonce = _nonce
 	t.Message = _message
 	
-	t.Sign(_private_key)
+	_, err := t.Sign(_private_key)
+	if err != nil {
+		return Transaction{}
+	}
 	return t
 
 }
@@ -153,15 +156,29 @@ func (t *Transaction) SetHash(hash [32]byte) (string, error) {
 
 //Signs the transaction with the given private key
 func (t *Transaction) Sign(_private_key string) (string, error) {
-	_transaction_hash, _ := t.GetHash()
+	_transaction_hash, err := t.GetHash()
+	if err != nil {
+		return "", err
+	}
+	_, err = t.SetHash(_transaction_hash)
+	if err != nil {
+		return "", err
+	}
 
-	t.SetHash(_transaction_hash)
+	private_key_array, err := hex.DecodeString(_private_key)
+	if err != nil {
+		return "", err
+	}
 
-	private_key_array, _ := hex.DecodeString(_private_key)
+	private_key, err := x509.ParsePKCS1PrivateKey(private_key_array)
+	if err != nil {
+		return "", err
+	}
 
-	private_key, _ := x509.ParsePKCS1PrivateKey(private_key_array)
-
-	signature_bytes, _ := rsa.SignPKCS1v15(rand.Reader, private_key, crypto.SHA256, _transaction_hash[:])
+	signature_bytes, err := rsa.SignPKCS1v15(rand.Reader, private_key, crypto.SHA256, _transaction_hash[:])
+	if err != nil {
+		return "", err
+	}
 
 	signature := hex.EncodeToString(signature_bytes)
 
@@ -178,9 +195,15 @@ func (t *Transaction) Verify() (bool) {
 	if (!t.IsValid()){
 		return false
 	}
-	produced_hash, _ := t.GetHash()
+	produced_hash, err := t.GetHash()
+	if err != nil {
+		return false
+	}
 
-	signature, _ := hex.DecodeString(t.Signature)
+	signature, err := hex.DecodeString(t.Signature)
+	if err != nil {
+		return false
+	}
 
 	var public_key_string string
 
@@ -191,11 +214,18 @@ func (t *Transaction) Verify() (bool) {
 		public_key_string = t.Sender_address
 	}
 
-	public_key_array, _ := hex.DecodeString(public_key_string)
+	public_key_array, err := hex.DecodeString(public_key_string)
+	if err != nil {
+		return false
+	}
 
-	public_key, _ := x509.ParsePKCS1PublicKey(public_key_array[:])
+	public_key, err := x509.ParsePKCS1PublicKey(public_key_array[:])
+	if err != nil {
+		return false
+	}
 
-	err := rsa.VerifyPKCS1v15(public_key, crypto.SHA256, produced_hash[:], signature[:])
+	err = rsa.VerifyPKCS1v15(public_key, crypto.SHA256, produced_hash[:], signature[:])
+
 	return err == nil
 }
 
