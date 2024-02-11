@@ -1,7 +1,1 @@
-{
-    "0": {
-        "balance": 1000,
-        "curent_nonce": 3,
-        "messages": []
-    }
-}
+{"0":{"balance":1003,"curent_nonce":2,"messages":[]},"1":{"balance":997,"curent_nonce":2,"messages":[]}}

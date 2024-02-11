@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"time"
+
 	"github.com/segmentio/kafka-go"
 )
 
-func newNodeEnter() error {
+func ordinaryNodeEnter() error {
 
 	var w *kafka.Writer = &kafka.Writer{
 		Addr: kafka.TCP(node.brokerURL),
@@ -40,7 +41,7 @@ func newNodeEnter() error {
 
 		t, _ := time.Parse(node.timeFormat, node.startTime)
 		if m.Time.Before(t) {
-			logger.Error("Received messages created before: "+node.startTime, err)
+			logger.Error("Received messages created before","node start time",node.startTime, "welcome received",m.Time.Format(node.timeFormat))
 			continue
 		}
 
@@ -54,6 +55,9 @@ func newNodeEnter() error {
 
 		node.myBlockchain = welcomeMessage.Bc
 		node.nodeIdArray = welcomeMessage.NodesIn[:]
+		for id, key := range node.nodeIdArray {
+			node.nodeMap[key] = id
+		}
 
 		node.myBlockchain.WriteBlockchain()
 		if err != nil {
@@ -86,6 +90,42 @@ func newNodeEnter() error {
 	return nil
 }
 
+func bootstrapNodeEnter() error {
+	var err error
+	var myBlockchain *Blockchain = &node.myBlockchain
+		//Creates genesis block
+		genesis := GenesisBlock(node.myPublicKey, node.myPrivateKey)
+		logger.Info("Genesis block created")
+
+		//Appends genesis to blockchain
+		*myBlockchain = append(*myBlockchain, genesis)
+
+		//Writes blockchain json to output file
+		err = myBlockchain.WriteBlockchain()
+		if err != nil {
+			logger.Error("Could not write genesis blockchain", err)
+			return err
+		}
+		logger.Info("Blockchain written successfully")
+
+		node.myDB, err = node.myBlockchain.MakeDB()
+		if err != nil {
+			logger.Error("Could not make DB from genesis blockchain", err)
+			return err
+		}
+		err = node.myDB.WriteDB()
+		if err != nil {
+			logger.Error("Could not store bootstrap db to file", err)
+			return err
+		}
+
+		err = node.collectNodesInfo()
+		if err != nil {
+			logger.Error("Could not collect nodes info", err)
+		}
+		return nil
+}
+
 func blockListener() error {
 
 	block, validator, err := getNewBlock(node.blockConsumer)
@@ -97,6 +137,7 @@ func blockListener() error {
 
 	// node_temp := *node
 	// logger.Info("Check this hash:", "hash", node_temp.currentBlock.Current_hash)
+	logger.Warn("Check this","my_hash",node.currentBlock.Current_hash,"received_hash",block.Current_hash)
 
 	if node.currentBlock.Current_hash == block.Current_hash /*&& validator == node.currentBlock.Validator*/ {
 
@@ -139,12 +180,11 @@ func transactionListener() error {
 			return err
 		}
 		
-		
 		if !tx.Verify() {
 			logger.Warn("Transaction not verified")
+			continue
 		}
-		logger.Info("New ransaction received")
-
+		logger.Info("New transaction received")
 		if node.myDB.isTransactionPossible(&tx) {
 
 			if len(node.currentBlock.Transactions) < node.capacity {
@@ -177,14 +217,21 @@ func transactionListener() error {
 					err = blockListener()
 					if err != nil {
 						logger.Error("Experiment failed")
+						return err
 					}
 				}
 			} else {
 				logger.Warn("Capacity Reached")
+				return nil
 			}
 
 		} else {
 			logger.Warn("Transaction rejected")
+			if tx.Sender_address == node.myPublicKey {
+				logger.Warn("My nonce is decreased by one")
+				node.outboundNonce--
+
+			}
 		}
 
 	}
@@ -192,54 +239,23 @@ func transactionListener() error {
 
 func StartNode() error {
 	startConfig()
-
-	var err error
-	var myBlockchain *Blockchain = &node.myBlockchain
-
 	if node.id == 0 {
 		//Case bootstrap node
 		logger.Info("Node is bootstrap node")
-
-		//Creates genesis block
-		genesis := GenesisBlock(node.myPublicKey, node.myPrivateKey)
-		logger.Info("Genesis block created")
-
-		//Appends genesis to blockchain
-		*myBlockchain = append(*myBlockchain, genesis)
-
-		//Writes blockchain json to output file
-		err = myBlockchain.WriteBlockchain()
+		err := bootstrapNodeEnter()
 		if err != nil {
-			logger.Error("Could not write genesis blockchain", err)
+			logger.Error("Error in starting bootsrap node", err)
 			return err
-		}
-		logger.Info("Blockchain written successfully")
-
-		node.myDB, err = node.myBlockchain.MakeDB()
-		if err != nil {
-			logger.Error("Could not make DB from genesis blockchain", err)
-			return err
-		}
-		err = node.myDB.WriteDB()
-		if err != nil {
-			logger.Error("Could not store bootstrap db to file", err)
-			return err
-		}
-
-		err = node.collectNodesInfo()
-		if err != nil {
-			logger.Error("Could not collect nodes info", err)
 		}
 
 	} else {
 		logger.Info("Node is ordinary")
-		err = newNodeEnter()
+		err := ordinaryNodeEnter()
 		if err != nil {
 			logger.Error("Could not enter the cluster", err)
 			return err
 		}
 	}
-
 	//Start node kafka consumers and writers
 	node.writer = &kafka.Writer{
 		Addr: kafka.TCP(node.brokerURL),
@@ -257,13 +273,14 @@ func StartNode() error {
 		GroupID:     node.idString,
 	})
 
+	logger.Info("Created post-transaction and post-block readers")
+	
 	_lasthash := node.myBlockchain[len(node.myBlockchain)-1].Current_hash
 
 	_index := node.myBlockchain[len(node.myBlockchain)-1].Index + 1
 
 	node.currentBlock = NewBlock(_index, _lasthash)
 
-	//go blockListener()
 	go startRPC()
 	transactionListener()
 	return nil

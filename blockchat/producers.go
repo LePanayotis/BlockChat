@@ -83,6 +83,7 @@ func (node *nodeConfig) broadcastWelcome(W *kafka.Writer) error {
 		Headers:  node.myHeaders,
 		Value:   payload,
 	})
+	logger.Info("Sent welcome message")
 	return nil
 }
 

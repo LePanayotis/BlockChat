@@ -108,15 +108,15 @@ func (db *DBmap) addMessage(_account_key string, m Message) {
 
 
 func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
+	senderId := node.nodeMap[tx.Sender_address]
 	db.accountExistsAdd(tx.Sender_address, true)
 	db.accountExistsAdd(tx.Receiver_address, true)
 	if tx.Sender_address != "0" {
-		db.increaseNonce(tx.Sender_address)
-		// if tx.Nonce == (*db)[tx.Sender_address].Curent_Nonce+1 {
-			
-		// } else {
-		// 	return 0, errors.New("Transaction nonce invalid")
-		// }
+		if tx.Nonce == (*db)[senderId].Curent_Nonce+1 {
+			db.increaseNonce(tx.Sender_address)
+		} else {
+			return 0, errors.New("Transaction nonce invalid")
+		}
 	}
 
 	fee := tx.CalcFee()
@@ -125,7 +125,7 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 		db.changeBalance(tx.Receiver_address, tx.Amount)
 		if tx.Type_of_transaction == "message" {
 
-			senderId := node.nodeMap[tx.Sender_address]
+			
 			db.addMessage(tx.Receiver_address, Message{
 				Sender:  senderId,
 				Nonce:   tx.Nonce,

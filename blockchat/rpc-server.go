@@ -41,9 +41,8 @@ func (p *RPC) Create_transaction(args *TransactionArgs, reply *error) error {
 	*reply = sendTransaction(node.writer, tx)
 	if *reply != nil {
 		logger.Error("Failed to send transaction", *reply)
-	} else {
 		node.outboundNonce--
-	}
+	} 
 	return *reply
 }
 
@@ -54,7 +53,6 @@ func (p *RPC) Stake(args *TransactionArgs, reply *error) error {
 	*reply = sendTransaction(node.writer, tx)
 	if *reply != nil {
 		logger.Error("Failed to send transaction", *reply)
-	} else {
 		node.outboundNonce--
 	}
 	return *reply
