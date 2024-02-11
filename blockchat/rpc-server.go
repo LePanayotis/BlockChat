@@ -27,18 +27,18 @@ func (p *RPC) Create_transaction(args *TransactionArgs, reply *error) error {
 	var tx Transaction
 	var receiver_address string
 	if args.Receiver_node > -1 && args.Receiver_node < node.nodes {
-		receiver_address = node.nodeIdArray[args.Receiver_node]
+		receiver_address = node.idArray[args.Receiver_node]
 	} else {
 		*reply = fmt.Errorf("node must be between 0 and %d", node.nodes-1)
 		return *reply
 	}
 	node.outboundNonce++
 	if args.IsMessage {
-		tx = NewMessageTransaction(node.myPublicKey, receiver_address, args.Message, node.outboundNonce, node.myPrivateKey)
+		tx = NewMessageTransaction(node.publicKey, receiver_address, args.Message, node.outboundNonce, node.privateKey)
 	} else {
-		tx = NewTransferTransaction(node.myPublicKey, receiver_address, args.Amount, node.outboundNonce, node.myPrivateKey)
+		tx = NewTransferTransaction(node.publicKey, receiver_address, args.Amount, node.outboundNonce, node.privateKey)
 	}
-	*reply = sendTransaction(node.writer, tx)
+	*reply = node.sendTransaction(tx)
 	if *reply != nil {
 		logger.Error("Failed to send transaction", *reply)
 		node.outboundNonce--
@@ -49,8 +49,8 @@ func (p *RPC) Create_transaction(args *TransactionArgs, reply *error) error {
 func (p *RPC) Stake(args *TransactionArgs, reply *error) error {
 	logger.Info("Stake RPC called")
 	node.outboundNonce++
-	var tx Transaction = NewTransferTransaction(node.myPublicKey, "0", args.Amount, node.outboundNonce, node.myPrivateKey)
-	*reply = sendTransaction(node.writer, tx)
+	var tx Transaction = NewTransferTransaction(node.publicKey, "0", args.Amount, node.outboundNonce, node.privateKey)
+	*reply = node.sendTransaction(tx)
 	if *reply != nil {
 		logger.Error("Failed to send transaction", *reply)
 		node.outboundNonce--
@@ -73,13 +73,13 @@ func (p *RPC) Stop(_ struct{}, reply *error) error {
 
 func (p *RPC) Balance(_ struct{}, reply *float64) error {
 	logger.Info("Balance RPC called")
-	*reply = node.myDB.getBalance(node.myPublicKey)
+	*reply = node.myDB.getBalance(node.publicKey)
 	return nil
 }
 
 func (p *RPC) PrintWallet(_ struct{}, reply *string) error {
 	logger.Info("PrintWallet RPC called")
-	*reply = node.myPublicKey
+	*reply = node.publicKey
 
 	return nil
 }
@@ -87,7 +87,7 @@ func (p *RPC) PrintWallet(_ struct{}, reply *string) error {
 func (p *RPC) GetNonce(_ struct{}, reply *uint) error {
 	logger.Info("UseWallet RPC called")
 
-	var nonce uint = node.myDB.getNonce(node.myPublicKey)
+	var nonce uint = node.myDB.getNonce(node.publicKey)
 	*reply = nonce
 	return nil
 }

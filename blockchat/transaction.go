@@ -230,6 +230,8 @@ func (t *Transaction) Verify() (bool) {
 }
 
 
+
+// var node only used here:
 //Calculates the fee based on the type of the transaction
 func (t *Transaction) CalcFee() float64 {
 	if t.Sender_address == "0" || t.Receiver_address == "0" {

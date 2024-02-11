@@ -8,7 +8,7 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-func ordinaryNodeEnter() error {
+func (node *nodeConfig) ordinaryNodeEnter() error {
 
 	var w *kafka.Writer = &kafka.Writer{
 		Addr: kafka.TCP(node.brokerURL),
@@ -22,7 +22,7 @@ func ordinaryNodeEnter() error {
 
 	logger.Info("Kafka producer and welcome consumer connected")
 
-	err := declareExistence(w)
+	err := node.declareExistence()
 	if err != nil {
 		logger.Error("Could not declare existence to other nodes", err)
 		return err
@@ -53,20 +53,20 @@ func ordinaryNodeEnter() error {
 		}
 		logger.Info("Successfully parsed welcome message")
 
-		node.myBlockchain = welcomeMessage.Bc
-		node.nodeIdArray = welcomeMessage.NodesIn[:]
-		for id, key := range node.nodeIdArray {
+		node.blockchain = welcomeMessage.Bc
+		node.idArray = welcomeMessage.NodesIn[:]
+		for id, key := range node.idArray {
 			node.nodeMap[key] = id
 		}
 
-		node.myBlockchain.WriteBlockchain()
+		node.WriteBlockchain(&node.blockchain)
 		if err != nil {
 			logger.Error("Could not write blockchain", err)
 			return err
 		}
 		logger.Info("Successfully wrote blockchain to file")
 
-		node.myDB, err = node.myBlockchain.MakeDB()
+		node.myDB, err = node.MakeDB(&node.blockchain)
 		if err != nil {
 			logger.Error("Creating database from blockchain failed", err)
 			return err
@@ -90,25 +90,25 @@ func ordinaryNodeEnter() error {
 	return nil
 }
 
-func bootstrapNodeEnter() error {
+func (node *nodeConfig) bootstrapNodeEnter() error {
 	var err error
-	var myBlockchain *Blockchain = &node.myBlockchain
+	var myBlockchain *Blockchain = &node.blockchain
 		//Creates genesis block
-		genesis := GenesisBlock(node.myPublicKey, node.myPrivateKey)
+		genesis := node.GenesisBlock()
 		logger.Info("Genesis block created")
 
 		//Appends genesis to blockchain
 		*myBlockchain = append(*myBlockchain, genesis)
 
 		//Writes blockchain json to output file
-		err = myBlockchain.WriteBlockchain()
+		err = node.WriteBlockchain(&node.blockchain)
 		if err != nil {
 			logger.Error("Could not write genesis blockchain", err)
 			return err
 		}
 		logger.Info("Blockchain written successfully")
 
-		node.myDB, err = node.myBlockchain.MakeDB()
+		node.myDB, err = node.MakeDB(&node.blockchain)
 		if err != nil {
 			logger.Error("Could not make DB from genesis blockchain", err)
 			return err
@@ -141,7 +141,7 @@ func blockListener() error {
 
 	if node.currentBlock.Current_hash == block.Current_hash /*&& validator == node.currentBlock.Validator*/ {
 
-		node.myBlockchain = append(node.myBlockchain, block)
+		node.blockchain = append(node.blockchain, block)
 		node.currentBlock = NewBlock(block.Index+1, block.Current_hash)
 
 		logger.Info("New block accepted", "validator node:", node.nodeMap[validator])
@@ -157,7 +157,7 @@ func blockListener() error {
 			logger.Error("Failed writing database", err)
 			return err
 		}
-		err = node.myBlockchain.WriteBlockchain()
+		err = node.WriteBlockchain(&node.blockchain)
 		if err != nil {
 			logger.Error("Failed writing blockchain", err)
 			return err
@@ -204,10 +204,10 @@ func transactionListener() error {
 					node.currentBlock.SetValidator()
 					node.currentBlock.CalcHash()
 
-					if node.currentBlock.Validator == node.myPublicKey {
+					if node.currentBlock.Validator == node.id {
 						logger.Info("The node is broadcaster")
 						node.currentBlock.Timestamp = time.Now().UTC().Format(node.timeFormat)
-						err = broadcastBlock(node.writer, node.currentBlock)
+						err = node.broadcastBlock(node.currentBlock)
 						if err != nil {
 							logger.Error("Failed to broadcast new block", err)
 							return err
@@ -227,7 +227,7 @@ func transactionListener() error {
 
 		} else {
 			logger.Warn("Transaction rejected")
-			if tx.Sender_address == node.myPublicKey {
+			if tx.Sender_address == node.publicKey {
 				logger.Warn("My nonce is decreased by one")
 				node.outboundNonce--
 
@@ -242,7 +242,7 @@ func StartNode() error {
 	if node.id == 0 {
 		//Case bootstrap node
 		logger.Info("Node is bootstrap node")
-		err := bootstrapNodeEnter()
+		err := node.bootstrapNodeEnter()
 		if err != nil {
 			logger.Error("Error in starting bootsrap node", err)
 			return err
@@ -250,7 +250,7 @@ func StartNode() error {
 
 	} else {
 		logger.Info("Node is ordinary")
-		err := ordinaryNodeEnter()
+		err := node.ordinaryNodeEnter()
 		if err != nil {
 			logger.Error("Could not enter the cluster", err)
 			return err
@@ -275,9 +275,9 @@ func StartNode() error {
 
 	logger.Info("Created post-transaction and post-block readers")
 	
-	_lasthash := node.myBlockchain[len(node.myBlockchain)-1].Current_hash
+	_lasthash := node.blockchain[len(node.blockchain)-1].Current_hash
 
-	_index := node.myBlockchain[len(node.myBlockchain)-1].Index + 1
+	_index := node.blockchain[len(node.blockchain)-1].Index + 1
 
 	node.currentBlock = NewBlock(_index, _lasthash)
 

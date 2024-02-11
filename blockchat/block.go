@@ -19,7 +19,7 @@ type Block struct {
 	//Array with transactions in the blockchain
 	Transactions []Transaction `json:"transactions"`
 	//The public key of the block validator
-	Validator string `json:"validator"`
+	Validator int `json:"validator"`
 	//Hash produced from the result of GetConcat method
 	Current_hash string `json:"current_hash"`
 	//The hash of the previous block in the blockchain
@@ -28,7 +28,7 @@ type Block struct {
 
 // Returns concatenation of key properties of the block
 func (b *Block) GetConcat() string {
-	s := strconv.Itoa(b.Index) + b.Validator + b.Previous_hash
+	s := strconv.Itoa(b.Index) + strconv.Itoa(b.Validator) + b.Previous_hash
 	for _, value := range b.Transactions {
 		s = s + value.GetConcat()
 	}
@@ -47,9 +47,10 @@ func (b *Block) GetHash() ([32]byte, error) {
 // the first block of the blockchain with only one transaction
 // to the bootstrap node.
 // `_public_key` and `_private_key` are the ones of the bootstrap node
-func GenesisBlock(_public_key string, _priv_key string) Block {
+func (node *nodeConfig) GenesisBlock() Block {
 	//Timestamp in UTC in the format indicated in the TIME_FORMAT
 	timestamp := time.Now().UTC().Format(node.timeFormat)
+	_public_key , _priv_key := node.publicKey, node.privateKey
 
 	//The only transaction of the block granting INITIAL_BCC*(#number of nodes)
 	t := NewTransferTransaction("0", _public_key, node.initialBCC*float64(node.nodes), 0, _priv_key)
@@ -62,7 +63,7 @@ func GenesisBlock(_public_key string, _priv_key string) Block {
 		Index:         0,
 		Timestamp:     timestamp,
 		Transactions:  transactions,
-		Validator:     _public_key,
+		Validator:     0,
 		Previous_hash: "1",
 	}
 
@@ -78,11 +79,13 @@ func NewBlock(_index int, _previous_hash string) Block {
 	b := Block{
 		Index:         _index,
 		Transactions:  nil,
-		Validator:     "",
+		Validator:     -1,
 		Previous_hash: _previous_hash,
 	}
 	return b
 }
+
+
 
 // Calculates and sets the hash of the block
 func (b *Block) CalcHash() {
@@ -120,7 +123,7 @@ func ParseBlockJSON(s string) (Block, error) {
 
 // Checks whether is valid or not, provided the hash of the previous block
 func (b *Block) IsValid(_previous_hash string) bool {
-	if b.Index < 0 || b.Validator == "" {
+	if b.Index < 0 || b.Validator < 0 {
 		return false
 	}
 	temp := true
@@ -148,7 +151,7 @@ func (b *Block) SetValidator() {
 
 // Calculates the validator of the current block based on the stakes
 // A stake is a transfer to the "0" wallet
-func (b *Block) CalcValidator() string {
+func (b *Block) CalcValidator() int {
 	var NodeStakes []float64 = make([]float64, node.nodes)
 	var stakes int = 0
 	for i := range NodeStakes {
@@ -163,7 +166,7 @@ func (b *Block) CalcValidator() string {
 	}
 	//If no stakes have been made in the block, validator is node 0
 	if stakes == 0 {
-		return node.nodeIdArray[0]
+		return 0
 	}
 
 	//Calculate staking node
@@ -179,12 +182,13 @@ func (b *Block) CalcValidator() string {
 		NodeStakes[i] += temp
 		temp = NodeStakes[i]
 		if lucky < temp {
-			return node.nodeIdArray[i]
+			return i
+			//return node.nodeIdArray[i]
 		}
 	}
 
 	//if nothing goes right, validator is node 0
-	return node.nodeIdArray[0]
+	return 0
 
 }
 

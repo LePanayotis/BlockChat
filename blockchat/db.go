@@ -169,7 +169,8 @@ func (db *DBmap) addBlock(block *Block) error {
 		tmp, _ := db.addTransaction(&tx)
 		fee += tmp
 	}
-	db.changeBalance(block.Validator, fee)
+	validatorkey := node.idArray[block.Validator]
+	db.changeBalance(validatorkey, fee)
 	return nil
 }
 
@@ -182,6 +183,7 @@ func (db *DBmap) addBlockUndoStake(block *Block) error {
 		}
 		fee += tx.CalcFee()
 	}
-	db.changeBalance(block.Validator, fee)
+	validatorkey := node.idArray[block.Validator]
+	db.changeBalance(validatorkey, fee)
 	return nil
 }

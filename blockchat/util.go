@@ -18,7 +18,7 @@ func generateKeys() (string, string) {
 
 func (node * nodeConfig) setPublicKey(_key string, _node int){
 	node.nodeMap[_key] = _node
-	node.nodeIdArray[_node] = _key
+	node.idArray[_node] = _key
 }
 
 func isValidPublicKey(_key string) bool {
@@ -27,8 +27,8 @@ func isValidPublicKey(_key string) bool {
 
 func (node * nodeConfig) generateKeysUpdate() (string, string) {
 	pub, priv := generateKeys()
-	node.myPublicKey = pub
-	node.myPrivateKey = priv
+	node.publicKey = pub
+	node.privateKey = priv
 	node.setPublicKey(pub, node.id)
 	return pub, priv
 }

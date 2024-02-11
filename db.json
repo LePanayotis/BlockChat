@@ -1,1 +1,18 @@
-{"0":{"balance":1003,"curent_nonce":2,"messages":[]},"1":{"balance":997,"curent_nonce":2,"messages":[]}}
+{
+    "0": {
+        "balance": 817.5,
+        "curent_nonce": 5,
+        "messages": []
+    },
+    "1": {
+        "balance": 1182.5,
+        "curent_nonce": 2,
+        "messages": [
+            {
+                "sender": 0,
+                "nonce": 2,
+                "content": "Hi malaka mou"
+            }
+        ]
+    }
+}

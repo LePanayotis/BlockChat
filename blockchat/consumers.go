@@ -65,7 +65,7 @@ func (node * nodeConfig) collectNodesInfo() error {
 		_, b := node.nodeMap[strPublicKey]
 		if !b {
 			node.nodeMap[strPublicKey] = intNodeId
-			node.nodeIdArray[intNodeId] = strPublicKey
+			node.idArray[intNodeId] = strPublicKey
 			logger.Info("Node in","node",intNodeId)
 			i++
 		}

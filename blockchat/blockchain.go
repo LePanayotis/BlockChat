@@ -8,15 +8,7 @@ import (
 
 type Blockchain []Block
 
-func (B *Blockchain) GetBlockchainBytes() []byte {
-	byteArray, err := json.Marshal(B)
-	if err != nil {
-		return nil
-	}
-	return byteArray
-}
-
-func LoadBlockchain() (Blockchain, error) {
+func (node *nodeConfig) LoadBlockchain() (Blockchain, error) {
 	content, err := os.ReadFile(node.blockchainPath)
 	if err != nil {
 		return nil, err
@@ -25,7 +17,7 @@ func LoadBlockchain() (Blockchain, error) {
 	if err := json.Unmarshal(content, &blockchain); err != nil {
 		return nil, err
 	}
-	_, isValid := blockchain.IsValid()
+	_, isValid := node.IsValid(&blockchain)
 	if isValid {
 		return blockchain, nil
 	}
@@ -33,7 +25,7 @@ func LoadBlockchain() (Blockchain, error) {
 
 }
 
-func (B *Blockchain) WriteBlockchain() error {
+func (node *nodeConfig) WriteBlockchain(B* Blockchain) error {
 
 	file, err := os.Create(node.blockchainPath)
 	if err != nil {
@@ -51,7 +43,7 @@ func (B *Blockchain) WriteBlockchain() error {
 	return nil
 }
 
-func (B *Blockchain) IsValid() (int, bool) {
+func  (node * nodeConfig) IsValid(B *Blockchain)(int, bool) {
 	bool_state := true
 	prev_hash := node.genesisHash
 	i := 0
@@ -68,8 +60,8 @@ func (B *Blockchain) IsValid() (int, bool) {
 }
 
 // Need to change this
-func (B *Blockchain) MakeDB() (DBmap, error) {
-	index, _ := B.IsValid()
+func (node * nodeConfig) MakeDB(B *Blockchain)  (DBmap, error) {
+	index, _ := node.IsValid(B)
 	var dbmap DBmap = make(DBmap)
 	for i := 0; i < index; i++ {
 		block := (*B)[i]

@@ -12,7 +12,7 @@ type welcomeMessage struct {
 	NodesIn []string   `json:"nodesin"`
 }
 
-func sendTransaction(w *kafka.Writer, tx Transaction) error {
+func (node *nodeConfig) sendTransaction(tx Transaction) error {
 
 	//TODO: check if transaction can be performed
 
@@ -20,32 +20,32 @@ func sendTransaction(w *kafka.Writer, tx Transaction) error {
 	if err != nil {
 		return err
 	}
-	err = w.WriteMessages(context.Background(), kafka.Message{
+	err = node.writer.WriteMessages(context.Background(), kafka.Message{
 		Topic:   "post-transaction",
 		Value:   []byte(jsonString),
-		Headers: node.myHeaders,
+		Headers: node.headers,
 	})
 	return err
 }
 
-func declareExistence(w *kafka.Writer) error {
-	err := w.WriteMessages(context.Background(), kafka.Message{
+func (node *nodeConfig) declareExistence() error {
+	err := node.writer.WriteMessages(context.Background(), kafka.Message{
 		Topic:   "enter",
-		Headers:  node.myHeaders,
+		Headers:  node.headers,
 	})
 	return err
 }
 
-func broadcastBlock(w *kafka.Writer, b Block) error {
+func (node *nodeConfig) broadcastBlock(b Block) error {
 	blockJson, err := b.JSONify()
 	if err != nil {
 		return err
 	}
 	byteMessage := []byte(blockJson)
-	err = w.WriteMessages(context.Background(), kafka.Message{
+	err = node.writer.WriteMessages(context.Background(), kafka.Message{
 		Topic:   "post-block",
 		Value:   byteMessage,
-		Headers:  node.myHeaders,
+		Headers:  node.headers,
 	})
 	return err
 }
@@ -54,52 +54,35 @@ func broadcastBlock(w *kafka.Writer, b Block) error {
 func (node *nodeConfig) broadcastWelcome(W *kafka.Writer) error {
 
 	node.blockIndex++
-	_prev_blockchain := node.myBlockchain[len(node.myBlockchain)-1].Current_hash
+	_prev_blockchain := node.blockchain[len(node.blockchain)-1].Current_hash
 	block := NewBlock(node.blockIndex, _prev_blockchain)
 
-	for i := 1; i < len(node.nodeIdArray); i++ {
+	for i := 1; i < len(node.idArray); i++ {
 
-		node.outboundNonce = node.myDB.increaseNonce(node.myPublicKey)
-		tx := NewTransferTransaction(node.myPublicKey, node.nodeIdArray[i], node.initialBCC, node.outboundNonce, node.myPrivateKey)
+		node.outboundNonce = node.myDB.increaseNonce(node.publicKey)
+		tx := NewTransferTransaction(node.publicKey, node.idArray[i], node.initialBCC, node.outboundNonce, node.privateKey)
 		block.AddTransaction(&tx)
 	}
 	
 	block.Validator = block.CalcValidator()
 	block.CalcHash()
 
-	node.myBlockchain.AddBlock(&block)
+	node.blockchain.AddBlock(&block)
 
 	msg := welcomeMessage{
-		Bc:      node.myBlockchain,
-		NodesIn: node.nodeIdArray[:],
+		Bc:      node.blockchain,
+		NodesIn: node.idArray[:],
 	}
 	payload, _ := json.Marshal(msg)
-	node.myBlockchain.WriteBlockchain()
-	node.myDB, _ = node.myBlockchain.MakeDB()
+	node.WriteBlockchain(&node.blockchain)
+	node.myDB, _ = node.MakeDB(&node.blockchain)
 	node.myDB.WriteDB()
 
 	W.WriteMessages(context.Background(), kafka.Message{
 		Topic:   "welcome",
-		Headers:  node.myHeaders,
+		Headers:  node.headers,
 		Value:   payload,
 	})
 	logger.Info("Sent welcome message")
 	return nil
 }
-
-// func transmitBlockChain(w *kafka.Writer) error {
-// 	content, err := os.ReadFile(node.blockchainPath)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	nodeIdBytes := []byte(node.idString)
-// 	err = w.WriteMessages(context.Background(), kafka.Message{
-// 		Topic: "blockchain",
-// 		Value: content,
-// 		Headers: []kafka.Header{{
-// 			Key:   "SenderNode",
-// 			Value: nodeIdBytes,
-// 		}},
-// 	})
-// 	return err
-// }

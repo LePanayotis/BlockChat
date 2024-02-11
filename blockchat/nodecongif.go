@@ -25,17 +25,17 @@ type nodeConfig struct {
 	genesisHash         string `default:"1"`
 	brokerURL           string `default:"localhost:9093"`
 	id                  int    `default:"0"`
-	myPublicKey         string
-	myPrivateKey        string
+	publicKey         string
+	privateKey        string
 	currentBlock        Block
 	blockIndex          int    `default:"0"`
 	lastHash            string `default:"1"`
 	nodeMap             map[string]int
-	nodeIdArray         []string
+	idArray         []string
 	idString            string `default:"0"`
 	startTime           string
-	myHeaders           []kafka.Header
-	myBlockchain        Blockchain
+	headers           []kafka.Header
+	blockchain        Blockchain
 	myDB                DBmap
 	writer              *kafka.Writer
 	txConsumer          *kafka.Reader
@@ -119,20 +119,20 @@ func startConfig() {
 
 	logger.Info("Starting configuring node")
 	node.nodeMap = make(map[string]int)
-	node.nodeIdArray = make([]string, node.nodes)
+	node.idArray = make([]string, node.nodes)
 	node.generateKeysUpdate()
 	node.startTime = time.Now().UTC().Format(node.timeFormat)
 	node.lastHash = node.genesisHash
 	node.idString = strconv.Itoa(node.id)
 
-	node.myHeaders = []kafka.Header{
+	node.headers = []kafka.Header{
 		{
 			Key:   "NodeId",
 			Value: []byte(node.idString),
 		},
 		{
 			Key:   "NodeWallet",
-			Value: []byte(node.myPublicKey),
+			Value: []byte(node.publicKey),
 		},
 	}
 }
