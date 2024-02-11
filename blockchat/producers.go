@@ -51,17 +51,17 @@ func broadcastBlock(w *kafka.Writer, b Block) error {
 }
 
 // Broadcasts the initial blockchain and the nodes array of the cluster
-func broadcastWelcome(W *kafka.Writer) error {
+func (node *nodeConfig) broadcastWelcome(W *kafka.Writer) error {
 
 	node.blockIndex++
 	_prev_blockchain := node.myBlockchain[len(node.myBlockchain)-1].Current_hash
-
 	block := NewBlock(node.blockIndex, _prev_blockchain)
 
 	for i := 1; i < len(node.nodeIdArray); i++ {
-		tx := NewTransferTransaction(node.myPublicKey, node.nodeIdArray[i], node.initialBCC, myNonce, node.myPrivateKey)
+
+		node.outboundNonce = node.myDB.increaseNonce(node.myPublicKey)
+		tx := NewTransferTransaction(node.myPublicKey, node.nodeIdArray[i], node.initialBCC, node.outboundNonce, node.myPrivateKey)
 		block.AddTransaction(&tx)
-		myNonce++
 	}
 	
 	block.Validator = block.CalcValidator()
@@ -77,6 +77,7 @@ func broadcastWelcome(W *kafka.Writer) error {
 	node.myBlockchain.WriteBlockchain()
 	node.myDB, _ = node.myBlockchain.MakeDB()
 	node.myDB.WriteDB()
+
 	W.WriteMessages(context.Background(), kafka.Message{
 		Topic:   "welcome",
 		Headers:  node.myHeaders,

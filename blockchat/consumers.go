@@ -2,11 +2,9 @@ package blockchat
 
 import (
 	"context"
-	"errors"
+	"strconv"
 	"github.com/segmentio/kafka-go"
 )
-
-
 func getNewBlock(r *kafka.Reader) (Block, string, error) {
 	m, err := r.ReadMessage(context.Background())
 	if err != nil {
@@ -30,8 +28,51 @@ func getNewTransaction(r *kafka.Reader) (Transaction, error) {
 	if err != nil {
 		return tx, err
 	}
-	if !tx.Verify() {
-		return tx, errors.New("transaction not verified")
-	}
 	return tx, nil
+}
+
+
+
+
+func (node * nodeConfig) collectNodesInfo() error {
+
+	if node.nodes == 1 {
+		logger.Info("I'm an alone node :'(")
+		return nil
+	}
+
+	r := kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     []string{node.brokerURL},
+		Topic:       "enter",
+		StartOffset: kafka.LastOffset,
+		GroupID:     node.idString,
+	})
+	
+	w := &kafka.Writer{
+		Addr: kafka.TCP(node.brokerURL),
+	}
+	logger.Info("Kafka producer and enter consumer connected")
+
+	i := 1
+	for i < node.nodes {
+		m, err := r.ReadMessage(context.Background())
+		if err != nil {
+			continue
+		}
+
+		strPublicKey := string(m.Headers[1].Value)
+		intNodeId, _ := strconv.Atoi(string(m.Headers[0].Value))
+		_, b := node.nodeMap[strPublicKey]
+		if !b {
+			node.nodeMap[strPublicKey] = intNodeId
+			node.nodeIdArray[intNodeId] = strPublicKey
+			i++
+		}
+	}
+	node.broadcastWelcome(w)
+	go func() {
+		w.Close()
+		r.Close()
+	}()
+	return nil
 }

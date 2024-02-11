@@ -29,8 +29,6 @@ func (node * nodeConfig) generateKeysUpdate() (string, string) {
 	pub, priv := generateKeys()
 	node.myPublicKey = pub
 	node.myPrivateKey = priv
-	node.currentPublicKey = pub
-	node.currentPrivateKey = priv
 	node.setPublicKey(pub, node.id)
 	return pub, priv
 }

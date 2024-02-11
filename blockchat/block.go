@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"hash/fnv"
 	"math/rand"
 	"strconv"
@@ -14,17 +13,17 @@ import (
 // Basic struct that represents the blocks of the Blockchain
 type Block struct {
 	//The increasing index of the block in the blockchain
-	Index int
+	Index int `json:"index"`
 	//Creation publication timestamp
-	Timestamp string
+	Timestamp string `json:"timestamp"`
 	//Array with transactions in the blockchain
-	Transactions []Transaction
+	Transactions []Transaction `json:"transactions"`
 	//The public key of the block validator
-	Validator string
+	Validator string `json:"validator"`
 	//Hash produced from the result of GetConcat method
-	Current_hash string
+	Current_hash string `json:"current_hash"`
 	//The hash of the previous block in the blockchain
-	Previous_hash string
+	Previous_hash string `json:"previous_hash"`
 }
 
 // Returns concatenation of key properties of the block
@@ -92,13 +91,9 @@ func (b *Block) CalcHash() {
 }
 
 // Appends transaction to the transaction list
-func (b *Block) AddTransaction(tx *Transaction) (int, error) {
-	//Only verified transactions accepted
-	if !tx.Verify() {
-		return -1, errors.New("transaction verification failed")
-	}
+func (b *Block) AddTransaction(tx *Transaction) int{
 	b.Transactions = append(b.Transactions, *tx)
-	return len(b.Transactions), nil
+	return len(b.Transactions)
 }
 
 // Return the string of the JSON representation of the block

@@ -7,17 +7,15 @@ import (
 	"strconv"
 )
 
-var _input_priv_key, _input_pub_key string
 var isMessage bool
 var messagePayload string
-var toNode int
 
 var transactionCmd = &cobra.Command{
 	Use:     "transaction",
 	Aliases: []string{"t"},
 	Short:   "Sends new transaction",
 	Long:    "Sends new transaction",
-	Args:    cobra.MaximumNArgs(2),
+	Args:    cobra.RangeArgs(1,2),
 	Run: func(cmd *cobra.Command, args []string) {
 		client, err := rpc.Dial(node.protocol, node.socket)
 		if err != nil {
@@ -26,39 +24,26 @@ var transactionCmd = &cobra.Command{
 		}
 		defer client.Close()
 		//var params int = len(args)
-		var toAddress string = ""
 		var amount float64 = 0
 
+		receiverId, err := strconv.Atoi(args[0])
+		if err != nil {
+			fmt.Println("Error parsing recipient node id", err)
+			return
+		}
 		isMessage = messagePayload != ""
-
-		if toNode > -1 {
-			toAddress = ""
-			if !isMessage {
-				amount, err = strconv.ParseFloat(args[0], 64)
-				if err != nil {
-					fmt.Println("Error parsing amount")
-					return
-				}
+		if !isMessage && len(args) == 2{
+			amount, err = strconv.ParseFloat(args[1],64)
+			if err != nil {
+				fmt.Println("Error parsing amount", err)
+				return
 			}
-		} else {
-			if isMessage {
-				toAddress = args[0]
-			} else {
-				toAddress = args[0]
-				amount, err = strconv.ParseFloat(args[1], 64)
-				if err != nil {
-					fmt.Println("Error parsing amount")
-					return
-				}
-			}
-
 		}
 		tx := &TransactionArgs{
-			Receiver_address: toAddress,
+			Receiver_node: receiverId,
 			Amount:           amount,
 			Message:          messagePayload,
 			IsMessage:        isMessage,
-			ToNode:           toNode,
 		}
 		var reply error
 		err = client.Call("RPC.Create_transaction", tx, &reply)
@@ -94,46 +79,7 @@ var balanceCmd = &cobra.Command{
 	},
 }
 
-var generateWalletCmd = &cobra.Command{
-	Use:     "generate-wallet",
-	Aliases: []string{"gw"},
-	Short:   "Returns a new pair of Public and Private Keys",
-	Run: func(cmd *cobra.Command, args []string) {
-		client, err := rpc.Dial(node.protocol, node.socket)
-		if err != nil {
-			fmt.Println("Error connecting to server:", err)
-			return
-		}
-		defer client.Close()
-		var reply WalletArgs
-		err = client.Call("RPC.GenerateWallet", struct{}{}, &reply)
-		if err != nil {
-			fmt.Println("Error calling balance:", err)
-			return
-		}
-		fmt.Printf("Congrats, you have a new wallet!\nPublic key: %s\nPrivate key: %s\n", reply.PublicKey, reply.PrivateKey)
-	},
-}
 
-var useNodeWalletCmd = &cobra.Command{
-	Use:     "use-node-wallet",
-	Aliases: []string{"unw"},
-	Short:   "Uses the node's wallet",
-	Run: func(cmd *cobra.Command, args []string) {
-		client, err := rpc.Dial(node.protocol, node.socket)
-		if err != nil {
-			fmt.Println("Error connecting to server:", err)
-			return
-		}
-		defer client.Close()
-		var reply error
-		err = client.Call("RPC.UseNodeWallet", struct{}{}, &reply)
-		if err != nil {
-			fmt.Println("Error executing command:", err)
-			return
-		}
-	},
-}
 
 var printWalletCmd = &cobra.Command{
 	Use:     "print-wallet",
@@ -157,11 +103,9 @@ var printWalletCmd = &cobra.Command{
 	},
 }
 
-var useWalletCmd = &cobra.Command{
-	Use:     "use-wallet",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"uw"},
-	Short:   "Returns the current wallet used by the daemon",
+var getNonce = &cobra.Command{
+	Use:     "nonce",
+	Short:   "Returns the nonce wallet used by the daemon",
 	Run: func(cmd *cobra.Command, args []string) {
 		client, err := rpc.Dial(node.protocol, node.socket)
 		if err != nil {
@@ -169,20 +113,17 @@ var useWalletCmd = &cobra.Command{
 			return
 		}
 		defer client.Close()
-		wallet := WalletArgs{
-			PublicKey:  _input_pub_key,
-			PrivateKey: _input_priv_key,
-		}
-		var reply error
-		err = client.Call("RPC.UseWallet", &wallet, &reply)
+		var reply uint
+		err = client.Call("RPC.GetNonce", struct{}{}, &reply)
 		if err != nil {
 			fmt.Println("Error executing command:", err)
 			return
 		}
-		fmt.Println("The current wallet is:\n", _input_pub_key)
+		fmt.Printf("The current nonce is: %d\n", reply)
 
 	},
 }
+
 
 var stakeCmd = &cobra.Command{
 	Use:   "stake",
@@ -203,7 +144,7 @@ var stakeCmd = &cobra.Command{
 			}
 		}
 		tx := &TransactionArgs{
-			Receiver_address: "0",
+			Receiver_node: -1,
 			Amount:           amount,
 			Message:          "",
 			IsMessage:        false,
@@ -265,14 +206,12 @@ var startCmd = &cobra.Command{
 var commandSet []*cobra.Command = []*cobra.Command{
 	startCmd,
 	balanceCmd,
-	generateWalletCmd,
 	showBlockchain,
 	stopCmd,
 	stakeCmd,
 	transactionCmd,
 	printWalletCmd,
-	useNodeWalletCmd,
-	useWalletCmd,
+	getNonce,
 }
 
 var RootCmd = &cobra.Command{
@@ -298,13 +237,7 @@ func ConfigApp() {
 	startCmd.Flags().StringVarP(&node.brokerURL, "broker-url", "k", node.brokerURL, "The adress and port of the kafka broker")
 	startCmd.Flags().IntVarP(&node.nodes, "nodes", "N", node.nodes, "The number of nodes")
 
-	useWalletCmd.Flags().StringVar(&_input_pub_key, "public-key", "", "Public key of the wallet")
-	useWalletCmd.Flags().StringVar(&_input_priv_key, "private-key", "", "Private key of the RSA key pair of the wallet")
-	useWalletCmd.MarkFlagRequired("public-key")
-	useWalletCmd.MarkFlagRequired("private-key")
-
 	transactionCmd.Flags().StringVarP(&messagePayload, "message", "m", "", "If this flag exist, the transaction is a message")
-	transactionCmd.Flags().IntVarP(&toNode,"recipient-node", "r", -1, "Transaction with receiver the wallet of the indicated node")
 
 	for _, cmd := range commandSet {
 		cmd.Flags().StringVarP(&node.socket, "socket", "s", node.socket, "The tcp socket to connect to")

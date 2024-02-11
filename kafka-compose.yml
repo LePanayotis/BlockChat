@@ -10,6 +10,10 @@ services:
       - "zookeeper-volume:/bitnami"
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - cluster
+      - kafka-zookeeper
+
   kafka:
     restart: always
     image: docker.io/bitnami/kafka:3.3
@@ -27,8 +31,14 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
     depends_on:
       - zookeeper
+    networks:
+      - cluster
+      - kafka-zookeeper
 volumes:
   kafka-volume:
   zookeeper-volume:
+
 networks:
   cluster:
+    external: true
+  kafka-zookeeper:

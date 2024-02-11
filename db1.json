@@ -1,0 +1,12 @@
+{
+    "3048024100b3e43df591589ff930a588039be686f24f91cf44cc8ec0bd81f817ae3529f99f129dd83d548191f62a65cfd1b89e97413f8ff285674855f3ffcc2a2e8bbecded0203010001": {
+        "balance": 1000,
+        "curent_nonce": 0,
+        "messages": []
+    },
+    "3048024100cda73d16e87566219c79b84bf552947e900602e5f8a1e5c011847774b299bc3641b7a3f7c60f115282c8298281a994215b88c27995ce3e24a9e4e02e0fbf73390203010001": {
+        "balance": 1000,
+        "curent_nonce": 1,
+        "messages": []
+    }
+}

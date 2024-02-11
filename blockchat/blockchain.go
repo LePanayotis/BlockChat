@@ -34,12 +34,8 @@ func LoadBlockchain() (Blockchain, error) {
 }
 
 func (B *Blockchain) WriteBlockchain() error {
-	return B.WriteBlockchainAt(node.blockchainPath)
-}
 
-func (B *Blockchain) WriteBlockchainAt(path string) error {
-
-	file, err := os.Create(path)
+	file, err := os.Create(node.blockchainPath)
 	if err != nil {
 		return err
 	}

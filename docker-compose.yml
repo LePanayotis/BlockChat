@@ -1,25 +1,24 @@
 services:
   node0:
-    build:
-      context: .
-      dockerfile: dockerfile
+    image: blockchat
     environment:
       - NODE_ID=0
     env_file:
       - ./.env
+    networks:
+      - cluster
+
   node1:
-    build:
-      context: .
-      dockerfile: dockerfile
+    image: blockchat
     environment:
       - NODE_ID=1
     env_file:
       - ./.env
-  node2:
-    build:
-      context: .
-      dockerfile: dockerfile
-    environment:
-      - NODE_ID=2
-    env_file:
-      - ./.env
+    networks:
+      - cluster
+    depends_on:
+      - node0
+
+networks:
+  cluster:
+    external: true
