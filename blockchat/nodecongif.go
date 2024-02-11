@@ -135,6 +135,9 @@ func startConfig() {
 			Value: []byte(node.publicKey),
 		},
 	}
+	node.writer = &kafka.Writer{
+		Addr: kafka.TCP(node.brokerURL),
+	}
 }
 
 var logger *slog.Logger = slog.Default()

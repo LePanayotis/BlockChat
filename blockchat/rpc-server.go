@@ -73,7 +73,7 @@ func (p *RPC) Stop(_ struct{}, reply *error) error {
 
 func (p *RPC) Balance(_ struct{}, reply *float64) error {
 	logger.Info("Balance RPC called")
-	*reply = node.myDB.getBalance(node.publicKey)
+	*reply = node.myDB.getBalance(node.id)
 	return nil
 }
 
@@ -87,7 +87,7 @@ func (p *RPC) PrintWallet(_ struct{}, reply *string) error {
 func (p *RPC) GetNonce(_ struct{}, reply *uint) error {
 	logger.Info("UseWallet RPC called")
 
-	var nonce uint = node.myDB.getNonce(node.publicKey)
+	var nonce uint = node.myDB.getNonce(node.id)
 	*reply = nonce
 	return nil
 }

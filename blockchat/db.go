@@ -20,8 +20,8 @@ type WalletData struct {
 	Messages     []Message `json:"messages"`
 }
 
-func LoadDB() (DBmap, error) {
-	content, err := os.ReadFile(node.dbPath)
+func LoadDB(path string) (DBmap, error) {
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -32,9 +32,10 @@ func LoadDB() (DBmap, error) {
 	return db, nil
 }
 
-func (db *DBmap) WriteDB() error {
 
-	file, err := os.Create(node.dbPath)
+func (db *DBmap) WriteDB(path string) error {
+
+	file, err := os.Create(path)
 	if err != nil {
 		return err
 	}
@@ -50,16 +51,22 @@ func (db *DBmap) WriteDB() error {
 	return nil
 }
 
-func (db *DBmap) accountExists(_account_key string) bool {
-	return db.accountExistsAdd(_account_key, false)
+func (node *nodeConfig) LoadDB() (DBmap, error) {
+	return LoadDB(node.dbPath)
 }
 
-func (db *DBmap) accountExistsAdd(_account_key string, _add_if_not_exists bool) bool {
+func (node *nodeConfig) WriteDB() error { 
+	return node.myDB.WriteDB(node.dbPath)
+}
 
-	accountId := node.nodeMap[_account_key]
 
+func (db *DBmap) accountExists(accountId int) bool {
+	return db.accountExistsAdd(accountId, false)
+}
+
+func (db *DBmap) accountExistsAdd(accountId int, _add_if_not_exists bool) bool {
 	_, exists := (*db)[accountId]
-	if !exists && _account_key != "0" {
+	if !exists && accountId != -1 {
 		if _add_if_not_exists {
 			(*db)[accountId] = WalletData{
 				Balance:  0,
@@ -69,65 +76,65 @@ func (db *DBmap) accountExistsAdd(_account_key string, _add_if_not_exists bool) 
 		return false
 	}
 	return true
-
 }
 
-func (db *DBmap) isTransactionPossible(tx *Transaction) bool {
+func (db *DBmap) isTransactionPossible(tx *Transaction, accountId int) bool {
 	if tx.Sender_address == "0" {
 		return true
 	}
-	accountId := node.nodeMap[tx.Sender_address]
 	logger.Info("Transaction details:","fee",tx.CalcFee(),"amount",tx.Amount,"balance",(*db)[accountId].Balance)
 	return tx.CalcFee()+tx.Amount <= (*db)[accountId].Balance
 }
 
-func (db *DBmap) changeBalance(_account_key string, _amount float64) error {
-	accountId := node.nodeMap[_account_key]
-	if _account_key != "0" {
-		var new_wallet WalletData = (*db)[accountId]
+func (node *nodeConfig) isTransactionPossible(tx *Transaction) bool {
+	accoundId := node.nodeMap[tx.Sender_address]
+	return node.myDB.isTransactionPossible(tx, accoundId)
+
+}
+
+func (db *DBmap) changeBalance(_accountId int, _amount float64) error {
+	if _accountId != -1 {
+		var new_wallet WalletData = (*db)[_accountId]
 		if new_wallet.Balance+_amount >= 0 {
 			new_wallet.Balance += _amount
-			(*db)[accountId] = new_wallet
+			(*db)[_accountId] = new_wallet
 			return nil
 		}
 		return errors.New("insufficient balance")
 	}
 	return nil
-
 }
 
-func (db *DBmap) addMessage(_account_key string, m Message) {
-	accountId := node.nodeMap[_account_key]
-	if _account_key == "" {
-		return
+func (db *DBmap) addMessage(_accountId int, m Message) error{
+	if _accountId < 0 {
+		return errors.New("account non existent")
 	}
-	var new_wallet WalletData = (*db)[accountId]
-	new_wallet.Messages = append(new_wallet.Messages, m)
-	(*db)[accountId] = new_wallet
+	var newWallet WalletData = (*db)[_accountId]
+	newWallet.Messages = append(newWallet.Messages, m)
+	(*db)[_accountId] = newWallet
+	return nil
 }
 
 
-func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
-	senderId := node.nodeMap[tx.Sender_address]
-	db.accountExistsAdd(tx.Sender_address, true)
-	db.accountExistsAdd(tx.Receiver_address, true)
-	if tx.Sender_address != "0" {
-		if tx.Nonce == (*db)[senderId].Curent_Nonce+1 {
-			db.increaseNonce(tx.Sender_address)
+func (db *DBmap) addTransaction(tx *Transaction, _senderId int, _receiverId int) (float64, error) {
+
+	db.accountExistsAdd(_senderId, true)
+	db.accountExistsAdd(_receiverId, true)
+	
+	if _senderId != -1 {
+		if tx.Nonce == (*db)[_senderId].Curent_Nonce+1 {
+			db.increaseNonce(_senderId)
 		} else {
 			return 0, errors.New("Transaction nonce invalid")
 		}
 	}
-
 	fee := tx.CalcFee()
-	err := db.changeBalance(tx.Sender_address, 0-tx.Amount-fee)
+	err := db.changeBalance(_senderId, 0-tx.Amount-fee)
 	if err == nil {
-		db.changeBalance(tx.Receiver_address, tx.Amount)
-		if tx.Type_of_transaction == "message" {
-
-			
-			db.addMessage(tx.Receiver_address, Message{
-				Sender:  senderId,
+		db.changeBalance(_receiverId, tx.Amount)
+		if tx.Type_of_transaction == "message" {			
+			db.addMessage(_receiverId, Message{
+				Sender:  _senderId,
 				Nonce:   tx.Nonce,
 				Content: tx.Message,
 			})
@@ -137,53 +144,72 @@ func (db *DBmap) addTransaction(tx *Transaction) (float64, error) {
 	return 0, err
 }
 
-func (db *DBmap) getBalance(_account_key string) float64 {
-	accountId := node.nodeMap[_account_key]
-	return (*db)[accountId].Balance
+func (db *DBmap) getBalance(_accountId int) float64 {
+	return (*db)[_accountId].Balance
 }
 
-func (db *DBmap) increaseNonce(_account_key string) uint {
-	accountId := node.nodeMap[_account_key]
-	if _, b := (*db)[accountId]; b {
-		temp := (*db)[accountId]
+func (db *DBmap) increaseNonce(_accountId int) uint {
+	if _, b := (*db)[_accountId]; b {
+		temp := (*db)[_accountId]
 		temp.Curent_Nonce++
-		(*db)[accountId] = temp
+		(*db)[_accountId] = temp
 	}
-	return (*db)[accountId].Curent_Nonce
+	return (*db)[_accountId].Curent_Nonce
 }
 
-func (db *DBmap) getNonce(_account_key string) uint {
-	accountId := node.nodeMap[_account_key]
-	return (*db)[accountId].Curent_Nonce
+func (db *DBmap) getNonce(_accountId int) uint {
+	return (*db)[_accountId].Curent_Nonce
 }
 
-func (db *DBmap) addBlock(block *Block) error {
+
+func (node *nodeConfig) addTransactionToDB(tx *Transaction) (float64, error) {
+	var _senderId, _receiverId int
+	if tx.Sender_address == "0" {
+		_senderId = -1
+	} else {
+		_senderId = node.nodeMap[tx.Sender_address]
+	}
+	if tx.Receiver_address == "0" {
+		_receiverId = -1
+	}else {
+		_receiverId = node.nodeMap[tx.Receiver_address]
+	}
+	
+	return node.myDB.addTransaction(tx, _senderId, _receiverId)
+}
+
+
+func (node * nodeConfig) addBlockToDB(block *Block) error {
 	fee := float64(0)
+	db :=  &node.myDB
 	for _, tx := range block.Transactions {
-		if !db.isTransactionPossible(&tx) {
+		if !node.isTransactionPossible(&tx) {
 			continue
 		}
 		if tx.Receiver_address == "0" {
 			continue
 		}
-		tmp, _ := db.addTransaction(&tx)
+		tmp, _ := node.addTransactionToDB(&tx)
 		fee += tmp
 	}
-	validatorkey := node.idArray[block.Validator]
-	db.changeBalance(validatorkey, fee)
+	db.changeBalance(block.Validator, fee)
 	return nil
 }
 
-func (db *DBmap) addBlockUndoStake(block *Block) error {
+func (node *nodeConfig) addBlockUndoStake(block *Block) error {
 	fee := float64(0)
 	for _, tx := range block.Transactions {
 		if tx.Receiver_address == "0" {
-			db.changeBalance(tx.Sender_address, tx.Amount)
+			//Undos stakes
+			senderId := node.nodeMap[tx.Sender_address]
+			if tx.Sender_address == "0" {
+				senderId = -1	
+			}
+			node.myDB.changeBalance(senderId, tx.Amount)
 			continue
 		}
 		fee += tx.CalcFee()
 	}
-	validatorkey := node.idArray[block.Validator]
-	db.changeBalance(validatorkey, fee)
+	node.myDB.changeBalance(block.Validator, fee)
 	return nil
 }

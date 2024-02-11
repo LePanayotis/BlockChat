@@ -5,17 +5,20 @@ import (
 	"strconv"
 	"github.com/segmentio/kafka-go"
 )
-func getNewBlock(r *kafka.Reader) (Block, string, error) {
+func getNewBlock(r *kafka.Reader) (Block, int, error) {
 	m, err := r.ReadMessage(context.Background())
 	if err != nil {
-		return Block{}, "", err
+		return Block{}, -1, err
 	}
 	B, err := ParseBlockJSON(string(m.Value))
 	if err != nil {
-		return Block{}, "", err
+		return Block{}, -1, err
 	}
-	stringId := string(m.Headers[1].Value)
-	return B, stringId, nil
+	validator, err := strconv.Atoi(string(m.Headers[0].Value))
+	if err != nil {
+		return Block{}, -1, err
+	}
+	return B, validator, nil
 }
 
 func getNewTransaction(r *kafka.Reader) (Transaction, error) {

@@ -17,7 +17,7 @@ func (node *nodeConfig) LoadBlockchain() (Blockchain, error) {
 	if err := json.Unmarshal(content, &blockchain); err != nil {
 		return nil, err
 	}
-	_, isValid := node.IsValid(&blockchain)
+	_, isValid := node.IsBlockchainValid()
 	if isValid {
 		return blockchain, nil
 	}
@@ -25,9 +25,9 @@ func (node *nodeConfig) LoadBlockchain() (Blockchain, error) {
 
 }
 
-func (node *nodeConfig) WriteBlockchain(B* Blockchain) error {
+func (B *Blockchain) WriteBlockchain(path string) error {
 
-	file, err := os.Create(node.blockchainPath)
+	file, err := os.Create(path)
 	if err != nil {
 		return err
 	}
@@ -43,13 +43,24 @@ func (node *nodeConfig) WriteBlockchain(B* Blockchain) error {
 	return nil
 }
 
-func  (node * nodeConfig) IsValid(B *Blockchain)(int, bool) {
+
+
+
+func (node *nodeConfig) WriteBlockchain() error {
+	err := node.blockchain.WriteBlockchain(node.blockchainPath)
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
+func  (B *Blockchain) IsValid(previousHash string)(int, bool) {
 	bool_state := true
-	prev_hash := node.genesisHash
 	i := 0
 	for _, block := range *B {
-		bool_state = bool_state && block.IsValid(prev_hash) && block.Index == i
-		prev_hash = block.Current_hash
+		bool_state = bool_state && block.IsValid(previousHash) && block.Index == i
+		previousHash = block.Current_hash
 		i++
 		if !bool_state {
 			i--
@@ -59,15 +70,23 @@ func  (node * nodeConfig) IsValid(B *Blockchain)(int, bool) {
 	return i, bool_state
 }
 
+func  (node * nodeConfig) IsBlockchainValid()(int, bool) {
+	return node.blockchain.IsValid(node.genesisHash)
+}
+
 // Need to change this
-func (node * nodeConfig) MakeDB(B *Blockchain)  (DBmap, error) {
-	index, _ := node.IsValid(B)
-	var dbmap DBmap = make(DBmap)
+func (node * nodeConfig) MakeDB()  error {
+	index, _ := node.IsBlockchainValid()
+	B := &node.blockchain
+	node.myDB = make(DBmap)
 	for i := 0; i < index; i++ {
 		block := (*B)[i]
-		dbmap.addBlock(&block)
+		err := node.addBlockToDB(&block)
+		if err != nil {
+			return err
+		}
 	}
-	return dbmap, nil
+	return nil
 }
 
 // Appends valid block to blockchain

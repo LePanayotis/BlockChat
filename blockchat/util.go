@@ -21,9 +21,9 @@ func (node * nodeConfig) setPublicKey(_key string, _node int){
 	node.idArray[_node] = _key
 }
 
-func isValidPublicKey(_key string) bool {
-	return len(_key) == node.keyLength/4 || _key == "0"
-}
+// func isValidPublicKey(_key string) bool {
+// 	return len(_key) == node.keyLength/4 || _key == "0"
+// }
 
 func (node * nodeConfig) generateKeysUpdate() (string, string) {
 	pub, priv := generateKeys()

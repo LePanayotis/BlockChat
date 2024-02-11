@@ -27,6 +27,7 @@ type Block struct {
 }
 
 // Returns concatenation of key properties of the block
+// TODO: use transaction hash instead of concatenation
 func (b *Block) GetConcat() string {
 	s := strconv.Itoa(b.Index) + strconv.Itoa(b.Validator) + b.Previous_hash
 	for _, value := range b.Transactions {
@@ -39,7 +40,6 @@ func (b *Block) GetConcat() string {
 func (b *Block) GetHash() ([32]byte, error) {
 	concat := []byte(b.GetConcat())
 	hash := sha256.Sum256(concat)
-
 	return hash, nil
 }
 
@@ -51,6 +51,7 @@ func (node *nodeConfig) GenesisBlock() Block {
 	//Timestamp in UTC in the format indicated in the TIME_FORMAT
 	timestamp := time.Now().UTC().Format(node.timeFormat)
 	_public_key , _priv_key := node.publicKey, node.privateKey
+	node.blockIndex = 0
 
 	//The only transaction of the block granting INITIAL_BCC*(#number of nodes)
 	t := NewTransferTransaction("0", _public_key, node.initialBCC*float64(node.nodes), 0, _priv_key)
@@ -75,13 +76,20 @@ func (node *nodeConfig) GenesisBlock() Block {
 }
 
 // Creates new block with input parameters its index and the hash of the previous block
-func NewBlock(_index int, _previous_hash string) Block {
+func (node *nodeConfig) NewBlock() Block {
+	//revise
+	if len(node.blockchain) == 0 {
+		return *new(Block)
+	}
+
+
 	b := Block{
-		Index:         _index,
+		Index:         node.blockIndex+1,
 		Transactions:  nil,
 		Validator:     -1,
-		Previous_hash: _previous_hash,
+		Previous_hash: node.blockchain[node.blockIndex].Current_hash,
 	}
+	node.blockIndex++
 	return b
 }
 

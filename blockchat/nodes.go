@@ -10,9 +10,7 @@ import (
 
 func (node *nodeConfig) ordinaryNodeEnter() error {
 
-	var w *kafka.Writer = &kafka.Writer{
-		Addr: kafka.TCP(node.brokerURL),
-	}
+
 	var r *kafka.Reader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     []string{node.brokerURL},
 		Topic:       "welcome",
@@ -59,21 +57,21 @@ func (node *nodeConfig) ordinaryNodeEnter() error {
 			node.nodeMap[key] = id
 		}
 
-		node.WriteBlockchain(&node.blockchain)
+		node.WriteBlockchain()
 		if err != nil {
 			logger.Error("Could not write blockchain", err)
 			return err
 		}
 		logger.Info("Successfully wrote blockchain to file")
 
-		node.myDB, err = node.MakeDB(&node.blockchain)
+		err = node.MakeDB()
 		if err != nil {
 			logger.Error("Creating database from blockchain failed", err)
 			return err
 		}
 		logger.Info("Successfully created database")
 
-		err = node.myDB.WriteDB()
+		err = node.WriteDB()
 		if err != nil {
 			logger.Error("Could not write database to file", err)
 			return err
@@ -85,7 +83,6 @@ func (node *nodeConfig) ordinaryNodeEnter() error {
 
 	go func() {
 		r.Close()
-		w.Close()
 	}()
 	return nil
 }
@@ -101,19 +98,19 @@ func (node *nodeConfig) bootstrapNodeEnter() error {
 		*myBlockchain = append(*myBlockchain, genesis)
 
 		//Writes blockchain json to output file
-		err = node.WriteBlockchain(&node.blockchain)
+		err = node.WriteBlockchain()
 		if err != nil {
 			logger.Error("Could not write genesis blockchain", err)
 			return err
 		}
 		logger.Info("Blockchain written successfully")
 
-		node.myDB, err = node.MakeDB(&node.blockchain)
+		err = node.MakeDB()
 		if err != nil {
 			logger.Error("Could not make DB from genesis blockchain", err)
 			return err
 		}
-		err = node.myDB.WriteDB()
+		err = node.WriteDB()
 		if err != nil {
 			logger.Error("Could not store bootstrap db to file", err)
 			return err
@@ -135,29 +132,25 @@ func blockListener() error {
 	}
 	logger.Info("Received new block")
 
-	// node_temp := *node
-	// logger.Info("Check this hash:", "hash", node_temp.currentBlock.Current_hash)
-	logger.Warn("Check this","my_hash",node.currentBlock.Current_hash,"received_hash",block.Current_hash)
-
-	if node.currentBlock.Current_hash == block.Current_hash /*&& validator == node.currentBlock.Validator*/ {
+	if node.currentBlock.Current_hash == block.Current_hash {
 
 		node.blockchain = append(node.blockchain, block)
-		node.currentBlock = NewBlock(block.Index+1, block.Current_hash)
+		node.currentBlock = node.NewBlock()
 
-		logger.Info("New block accepted", "validator node:", node.nodeMap[validator])
+		logger.Info("New block accepted", "validator node:", validator)
 
-		err = node.myDB.addBlockUndoStake(&block)
+		err = node.addBlockUndoStake(&block)
 		if err != nil {
 			logger.Error("Failed adding block to database", err)
 			return err
 		}
 
-		err = node.myDB.WriteDB()
+		err = node.WriteDB()
 		if err != nil {
 			logger.Error("Failed writing database", err)
 			return err
 		}
-		err = node.WriteBlockchain(&node.blockchain)
+		err = node.WriteBlockchain()
 		if err != nil {
 			logger.Error("Failed writing blockchain", err)
 			return err
@@ -185,11 +178,11 @@ func transactionListener() error {
 			continue
 		}
 		logger.Info("New transaction received")
-		if node.myDB.isTransactionPossible(&tx) {
+		if node.isTransactionPossible(&tx) {
 
 			if len(node.currentBlock.Transactions) < node.capacity {
 
-				_, err = node.myDB.addTransaction(&tx)
+				_, err = node.addTransactionToDB(&tx)
 				if err != nil {
 					logger.Error("Failed adding transaction to database", err)
 					return err
@@ -239,6 +232,7 @@ func transactionListener() error {
 
 func StartNode() error {
 	startConfig()
+
 	if node.id == 0 {
 		//Case bootstrap node
 		logger.Info("Node is bootstrap node")
@@ -257,9 +251,6 @@ func StartNode() error {
 		}
 	}
 	//Start node kafka consumers and writers
-	node.writer = &kafka.Writer{
-		Addr: kafka.TCP(node.brokerURL),
-	}
 	node.txConsumer = kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     []string{node.brokerURL},
 		Topic:       "post-transaction",
@@ -275,12 +266,8 @@ func StartNode() error {
 
 	logger.Info("Created post-transaction and post-block readers")
 	
-	_lasthash := node.blockchain[len(node.blockchain)-1].Current_hash
-
-	_index := node.blockchain[len(node.blockchain)-1].Index + 1
-
-	node.currentBlock = NewBlock(_index, _lasthash)
-
+	node.currentBlock = node.NewBlock()
+	//node.blockIndex++
 	go startRPC()
 	transactionListener()
 	return nil
