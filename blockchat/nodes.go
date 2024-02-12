@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"time"
-
 	"github.com/segmentio/kafka-go"
 )
 
@@ -37,9 +36,9 @@ func (node *nodeConfig) ordinaryNodeEnter() error {
 		}
 		logger.Info("Received welcome message")
 
-		t, _ := time.Parse(node.timeFormat, node.startTime)
+		t, _ := time.Parse(timeFormat, node.startTime)
 		if m.Time.Before(t) {
-			logger.Error("Received messages created before","node start time",node.startTime, "welcome received",m.Time.Format(node.timeFormat))
+			logger.Error("Received messages created before","node start time",node.startTime, "welcome received",m.Time.Format(timeFormat))
 			continue
 		}
 
@@ -123,16 +122,16 @@ func (node *nodeConfig) bootstrapNodeEnter() error {
 		return nil
 }
 
-func blockListener() error {
+func (node *nodeConfig) blockListener() error {
 
-	block, validator, err := getNewBlock(node.blockConsumer)
+	block, validator, err := node.getNewBlock()
 	if err != nil {
 		logger.Warn("Block listener exiting")
 		return err
 	}
 	logger.Info("Received new block")
 
-	if node.currentBlock.Current_hash == block.Current_hash {
+	if node.currentBlock.CurrentHash == block.CurrentHash {
 
 		node.blockchain = append(node.blockchain, block)
 		node.currentBlock = node.NewBlock()
@@ -164,10 +163,10 @@ func blockListener() error {
 	return nil
 }
 
-func transactionListener() error {
+func (node *nodeConfig) transactionListener() error {
 
 	for {
-		tx, err := getNewTransaction(node.txConsumer)
+		tx, err := node.getNewTransaction()
 		if err != nil {
 			logger.Warn("Transaction listener exiting")
 			return err
@@ -199,15 +198,15 @@ func transactionListener() error {
 
 					if node.currentBlock.Validator == node.id {
 						logger.Info("The node is broadcaster")
-						node.currentBlock.Timestamp = time.Now().UTC().Format(node.timeFormat)
-						err = node.broadcastBlock(node.currentBlock)
+						node.currentBlock.Timestamp = time.Now().UTC().Format(timeFormat)
+						err = node.broadcastBlock(&node.currentBlock)
 						if err != nil {
 							logger.Error("Failed to broadcast new block", err)
 							return err
 						}
 						logger.Info("Block broadcasted by me")
 					}
-					err = blockListener()
+					err = node.blockListener()
 					if err != nil {
 						logger.Error("Experiment failed")
 						return err
@@ -220,13 +219,12 @@ func transactionListener() error {
 
 		} else {
 			logger.Warn("Transaction rejected")
-			if tx.Sender_address == node.publicKey {
+			if tx.SenderAddress == node.publicKey {
 				logger.Warn("My nonce is decreased by one")
 				node.outboundNonce--
 
 			}
 		}
-
 	}
 }
 
@@ -268,7 +266,7 @@ func StartNode() error {
 	
 	node.currentBlock = node.NewBlock()
 	//node.blockIndex++
-	go startRPC()
-	transactionListener()
+	go node.startRPC()
+	node.transactionListener()
 	return nil
 }

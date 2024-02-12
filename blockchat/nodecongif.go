@@ -11,58 +11,46 @@ import (
 )
 
 type nodeConfig struct {
-	feePercentage       float64 `default:"0.03"`
-	costPerChar         int     `default:"1"`
-	blockchainPath      string
-	keyLength           int     `default:"512"`
-	timeFormat          string  `default:"02-01-2006 15:04:05.000"`
-	initialBCC          float64 `default:"1000"`
-	capacity            int     `default:"3"`
-	dbPath              string
-	nodes               int    `default:"1"`
-	socket              string `default:":1500"`
-	protocol            string `default:"tcp4"`
-	genesisHash         string `default:"1"`
-	brokerURL           string `default:"localhost:9093"`
-	id                  int    `default:"0"`
-	publicKey         string
-	privateKey        string
-	currentBlock        Block
-	blockIndex          int    `default:"0"`
-	lastHash            string `default:"1"`
-	nodeMap             map[string]int
-	idArray         []string
-	idString            string `default:"0"`
-	startTime           string
-	headers           []kafka.Header
-	blockchain        Blockchain
-	myDB                DBmap
-	writer              *kafka.Writer
-	txConsumer          *kafka.Reader
-	blockConsumer       *kafka.Reader
-	outboundNonce       uint
+	blockchainPath string
+	capacity       int
+	dbPath         string
+	nodes          int
+	socket         string
+	protocol       string
+	brokerURL      string
+	id             int
+	publicKey      string
+	privateKey     string
+	currentBlock   Block
+	blockIndex     int
+	lastHash       string
+	nodeMap        map[string]int
+	idArray        []string
+	idString       string
+	startTime      string
+	headers        []kafka.Header
+	blockchain     Blockchain
+	myDB           DBmap
+	writer         *kafka.Writer
+	txConsumer     *kafka.Reader
+	blockConsumer  *kafka.Reader
+	outboundNonce  uint
 }
 
 // Necessary configuration for the module
 var node *nodeConfig = &nodeConfig{
-	keyLength:           512,
-	timeFormat:          "02-01-2006 15:04:05.000",
-	feePercentage:       0.03,
-	costPerChar:         1,
-	blockchainPath:      "blockchain.json",
-	initialBCC:          1000,
-	capacity:            3,
-	dbPath:              "db.json",
-	nodes:               1,
-	socket:              ":1500",
-	protocol:            "tcp",
-	genesisHash:         "1",
-	brokerURL:           "localhost:9093",
-	id:                  0,
-	blockIndex:          0,
-	lastHash:            "1",
-	idString:            "0",
-	outboundNonce: 0,
+	blockchainPath: "blockchain.json",
+	capacity:       3,
+	dbPath:         "db.json",
+	nodes:          1,
+	socket:         ":1500",
+	protocol:       "tcp",
+	brokerURL:      "localhost:9093",
+	id:             0,
+	blockIndex:     0,
+	lastHash:       genesisHash,
+	idString:       "0",
+	outboundNonce:  0,
 }
 
 func (node *nodeConfig) EnvironmentConfig() error {
@@ -121,8 +109,8 @@ func startConfig() {
 	node.nodeMap = make(map[string]int)
 	node.idArray = make([]string, node.nodes)
 	node.generateKeysUpdate()
-	node.startTime = time.Now().UTC().Format(node.timeFormat)
-	node.lastHash = node.genesisHash
+	node.startTime = time.Now().UTC().Format(timeFormat)
+	node.lastHash = genesisHash
 	node.idString = strconv.Itoa(node.id)
 
 	node.headers = []kafka.Header{

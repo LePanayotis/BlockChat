@@ -21,15 +21,15 @@ type Block struct {
 	//The public key of the block validator
 	Validator int `json:"validator"`
 	//Hash produced from the result of GetConcat method
-	Current_hash string `json:"current_hash"`
+	CurrentHash string `json:"current_hash"`
 	//The hash of the previous block in the blockchain
-	Previous_hash string `json:"previous_hash"`
+	PreviousHash string `json:"previous_hash"`
 }
 
 // Returns concatenation of key properties of the block
 // TODO: use transaction hash instead of concatenation
 func (b *Block) GetConcat() string {
-	s := strconv.Itoa(b.Index) + strconv.Itoa(b.Validator) + b.Previous_hash
+	s := strconv.Itoa(b.Index) + strconv.Itoa(b.Validator) + b.PreviousHash
 	for _, value := range b.Transactions {
 		s = s + value.GetConcat()
 	}
@@ -46,15 +46,13 @@ func (b *Block) GetHash() ([32]byte, error) {
 // Creates the instance of the Genesis Block,
 // the first block of the blockchain with only one transaction
 // to the bootstrap node.
-// `_public_key` and `_private_key` are the ones of the bootstrap node
 func (node *nodeConfig) GenesisBlock() Block {
 	//Timestamp in UTC in the format indicated in the TIME_FORMAT
-	timestamp := time.Now().UTC().Format(node.timeFormat)
-	_public_key , _priv_key := node.publicKey, node.privateKey
+	timestamp := time.Now().UTC().Format(timeFormat)
 	node.blockIndex = 0
 
 	//The only transaction of the block granting INITIAL_BCC*(#number of nodes)
-	t := NewTransferTransaction("0", _public_key, node.initialBCC*float64(node.nodes), 0, _priv_key)
+	t := NewTransferTransaction("0", node.publicKey, initialBCC*float64(node.nodes), 0, node.privateKey)
 
 	transactions := []Transaction{
 		t,
@@ -65,12 +63,12 @@ func (node *nodeConfig) GenesisBlock() Block {
 		Timestamp:     timestamp,
 		Transactions:  transactions,
 		Validator:     0,
-		Previous_hash: "1",
+		PreviousHash: "1",
 	}
 
 	//produces and sets the hash
-	hash_bytes, _ := b.GetHash()
-	b.Current_hash = hex.EncodeToString(hash_bytes[:])
+	hashBytes, _ := b.GetHash()
+	b.CurrentHash = hex.EncodeToString(hashBytes[:])
 
 	return b
 }
@@ -78,16 +76,17 @@ func (node *nodeConfig) GenesisBlock() Block {
 // Creates new block with input parameters its index and the hash of the previous block
 func (node *nodeConfig) NewBlock() Block {
 	//revise
-	if len(node.blockchain) == 0 {
+
+	length := len(node.blockchain)
+	if length == 0 {
 		return *new(Block)
 	}
 
-
 	b := Block{
-		Index:         node.blockIndex+1,
+		Index:         length,
 		Transactions:  nil,
 		Validator:     -1,
-		Previous_hash: node.blockchain[node.blockIndex].Current_hash,
+		PreviousHash: node.blockchain[length-1].CurrentHash,
 	}
 	node.blockIndex++
 	return b
@@ -97,13 +96,13 @@ func (node *nodeConfig) NewBlock() Block {
 
 // Calculates and sets the hash of the block
 func (b *Block) CalcHash() {
-	hash_bytes, _ := b.GetHash()
-	b.Current_hash = hex.EncodeToString(hash_bytes[:])
+	hashBytes, _ := b.GetHash()
+	b.CurrentHash = hex.EncodeToString(hashBytes[:])
 }
 
 // Appends transaction to the transaction list
-func (b *Block) AddTransaction(tx *Transaction) int{
-	b.Transactions = append(b.Transactions, *tx)
+func (b *Block) AddTransaction(_tx *Transaction) int{
+	b.Transactions = append(b.Transactions, *_tx)
 	return len(b.Transactions)
 }
 
@@ -130,7 +129,7 @@ func ParseBlockJSON(s string) (Block, error) {
 }
 
 // Checks whether is valid or not, provided the hash of the previous block
-func (b *Block) IsValid(_previous_hash string) bool {
+func (b *Block) IsValid(_previousHash string) bool {
 	if b.Index < 0 || b.Validator < 0 {
 		return false
 	}
@@ -144,9 +143,9 @@ func (b *Block) IsValid(_previous_hash string) bool {
 	if temp {
 		_current_hash_bytes, _ := b.GetHash()
 		_current_hash := hex.EncodeToString(_current_hash_bytes[:])
-		temp = _current_hash == b.Current_hash
+		temp = _current_hash == b.CurrentHash
 		temp = temp && b.CalcValidator() == b.Validator
-		temp = temp && b.Previous_hash == _previous_hash
+		temp = temp && b.PreviousHash == _previousHash
 	}
 	return temp
 
@@ -166,9 +165,9 @@ func (b *Block) CalcValidator() int {
 		NodeStakes[i] = 0
 	}
 	for _, v := range b.Transactions {
-		if v.Receiver_address == "0" {
+		if v.ReceiverAddress == "0" {
 			stakes++
-			receiver_node := node.nodeMap[v.Sender_address]
+			receiver_node := node.nodeMap[v.SenderAddress]
 			NodeStakes[receiver_node] = v.Amount
 		}
 	}
@@ -183,7 +182,7 @@ func (b *Block) CalcValidator() int {
 		steaks_sum += v
 	}
 
-	randomGenerator := rand.New(rand.NewSource(stringToSeed(b.Previous_hash)))
+	randomGenerator := rand.New(rand.NewSource(stringToSeed(b.PreviousHash)))
 	lucky := randomGenerator.Float64() * steaks_sum
 	temp := 0.
 	for i := 0; i < node.nodes; i++ {
@@ -201,8 +200,8 @@ func (b *Block) CalcValidator() int {
 }
 
 // Converts a block's hash into a seed for an RNG algorithm used in CalcValidator()
-func stringToSeed(s string) int64 {
+func stringToSeed(_s string) int64 {
 	hash := fnv.New64a()
-	hash.Write([]byte(s))
+	hash.Write([]byte(_s))
 	return int64(hash.Sum64())
 }

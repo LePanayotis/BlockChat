@@ -32,13 +32,12 @@ func (p *RPC) Create_transaction(args *TransactionArgs, reply *error) error {
 		*reply = fmt.Errorf("node must be between 0 and %d", node.nodes-1)
 		return *reply
 	}
-	node.outboundNonce++
 	if args.IsMessage {
-		tx = NewMessageTransaction(node.publicKey, receiver_address, args.Message, node.outboundNonce, node.privateKey)
+		tx = node.NewMessageTransaction(receiver_address, args.Message)
 	} else {
-		tx = NewTransferTransaction(node.publicKey, receiver_address, args.Amount, node.outboundNonce, node.privateKey)
+		tx = node.NewTransferTransaction(receiver_address, args.Amount)
 	}
-	*reply = node.sendTransaction(tx)
+	*reply = node.sendTransaction(&tx)
 	if *reply != nil {
 		logger.Error("Failed to send transaction", *reply)
 		node.outboundNonce--
@@ -48,9 +47,10 @@ func (p *RPC) Create_transaction(args *TransactionArgs, reply *error) error {
 
 func (p *RPC) Stake(args *TransactionArgs, reply *error) error {
 	logger.Info("Stake RPC called")
-	node.outboundNonce++
-	var tx Transaction = NewTransferTransaction(node.publicKey, "0", args.Amount, node.outboundNonce, node.privateKey)
-	*reply = node.sendTransaction(tx)
+	//node.outboundNonce++
+	//var tx Transaction = NewTransferTransaction(node.publicKey, "0", args.Amount, node.outboundNonce, node.privateKey)
+	var tx Transaction = node.NewTransferTransaction("0", args.Amount)
+	*reply = node.sendTransaction(&tx)
 	if *reply != nil {
 		logger.Error("Failed to send transaction", *reply)
 		node.outboundNonce--
@@ -65,7 +65,7 @@ func (p *RPC) Stop(_ struct{}, reply *error) error {
 		logger.Info("Node will stop in 500ms")
 		time.Sleep(time.Millisecond * 500)
 		logger.Info("Node is stopping")
-		closeKafka()
+		node.closeKafka()
 		os.Exit(1)
 	}()
 	return nil
@@ -85,14 +85,14 @@ func (p *RPC) PrintWallet(_ struct{}, reply *string) error {
 }
 
 func (p *RPC) GetNonce(_ struct{}, reply *uint) error {
-	logger.Info("UseWallet RPC called")
+	logger.Info("GetNonce RPC called")
 
 	var nonce uint = node.myDB.getNonce(node.id)
 	*reply = nonce
 	return nil
 }
 
-func startRPC() error {
+func (node *nodeConfig) startRPC() error {
 	myrpc := new(RPC)
 
 	rpc.Register(myrpc)

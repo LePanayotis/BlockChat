@@ -25,9 +25,9 @@ func (node *nodeConfig) LoadBlockchain() (Blockchain, error) {
 
 }
 
-func (B *Blockchain) WriteBlockchain(path string) error {
+func (B *Blockchain) WriteBlockchain(_path string) error {
 
-	file, err := os.Create(path)
+	file, err := os.Create(_path)
 	if err != nil {
 		return err
 	}
@@ -55,23 +55,23 @@ func (node *nodeConfig) WriteBlockchain() error {
 
 }
 
-func  (B *Blockchain) IsValid(previousHash string)(int, bool) {
-	bool_state := true
+func  (B *Blockchain) IsValid(_previousHash string)(int, bool) {
+	boolState := true
 	i := 0
 	for _, block := range *B {
-		bool_state = bool_state && block.IsValid(previousHash) && block.Index == i
-		previousHash = block.Current_hash
+		boolState = boolState && block.IsValid(_previousHash) && block.Index == i
+		_previousHash = block.CurrentHash
 		i++
-		if !bool_state {
+		if !boolState {
 			i--
 			break
 		}
 	}
-	return i, bool_state
+	return i, boolState
 }
 
 func  (node * nodeConfig) IsBlockchainValid()(int, bool) {
-	return node.blockchain.IsValid(node.genesisHash)
+	return node.blockchain.IsValid(genesisHash)
 }
 
 // Need to change this
@@ -90,9 +90,9 @@ func (node * nodeConfig) MakeDB()  error {
 }
 
 // Appends valid block to blockchain
-func (B *Blockchain) AddBlock(block *Block) error {
-	if block.IsValid((*B)[len(*B)-1].Current_hash) && block.Index == len(*B) {
-		*B = append(*B, *block)
+func (B *Blockchain) AddBlock(_block *Block) error {
+	if _block.IsValid((*B)[len(*B)-1].CurrentHash) && _block.Index == len(*B) {
+		*B = append(*B, *_block)
 		return nil
 	}
 	return errors.New("Block not valid")

@@ -75,7 +75,7 @@ var balanceCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("Balance: %f BCCs\n", reply)
+		fmt.Printf("Balance: %f BCCs\\\\n", reply)
 	},
 }
 
@@ -98,7 +98,7 @@ var printWalletCmd = &cobra.Command{
 			fmt.Println("Error executing command:", err)
 			return
 		}
-		fmt.Println("The current wallet is:\n", reply)
+		fmt.Println("The current wallet is:\\\\n", reply)
 
 	},
 }
@@ -119,7 +119,7 @@ var getNonce = &cobra.Command{
 			fmt.Println("Error executing command:", err)
 			return
 		}
-		fmt.Printf("The current nonce is: %d\n", reply)
+		fmt.Printf("The current nonce is: %d\\\\n", reply)
 
 	},
 }
@@ -219,7 +219,7 @@ var RootCmd = &cobra.Command{
 	Short: "BlockChat is a simple CLI application",
 	Long:  `BlockChat is a simple CLI application built using Cobra.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Hi")
+		fmt.Println(" ______  __      ______  ______  __  __   ______  __  __  ______  ______  \n/\\  == \\/\\ \\    /\\  __ \\/\\  ___\\/\\ \\/ /  /\\  ___\\/\\ \\_\\ \\/\\  __ \\/\\__  _\\ \n\\ \\  __<\\ \\ \\___\\ \\ \\/\\ \\ \\ \\___\\ \\  _\"-.\\ \\ \\___\\ \\  __ \\ \\  __ \\/_/\\ \\/ \n \\ \\_____\\ \\_____\\ \\_____\\ \\_____\\ \\_\\ \\_\\\\ \\_____\\ \\_\\ \\_\\ \\_\\ \\_\\ \\ \\_\\ \n  \\/_____/\\/_____/\\/_____/\\/_____/\\/_/\\/_/ \\/_____/\\/_/\\/_/\\/_/\\/_/  \\/_/")
 	},
 }
 
@@ -228,12 +228,9 @@ func ConfigApp() {
 
 	startCmd.Flags().IntVarP(&node.id, "node-id","n", node.id, "The node id")
 	startCmd.Flags().IntVarP(&node.capacity, "capacity", "c", node.capacity, "The block capacity")
-	startCmd.Flags().IntVar(&node.costPerChar, "cost-per-char", node.costPerChar, "The cost per character of messages")
-	startCmd.Flags().Float64VarP(&node.feePercentage, "fee", "f", node.feePercentage, "The fee percentage written like 0.03")
-	startCmd.Flags().StringVar(&node.blockchainPath, "blockchain-path", node.blockchainPath, "The path of the blockchain's json file")
-	startCmd.Flags().StringVar(&node.dbPath, "database-path", node.dbPath, "The path of the blockchain's json file")
-	startCmd.Flags().StringVar(&node.genesisHash, "genesis-hash", node.genesisHash, "The hash of the Genesis Block")
-	startCmd.Flags().Float64VarP(&node.initialBCC, "initial-bcc", "b", node.initialBCC, "The initial BCC per node")
+	startCmd.Flags().StringVarP(&node.blockchainPath, "blockchain-path","b", node.blockchainPath, "The path of the blockchain's json file")
+	startCmd.Flags().StringVarP(&node.dbPath, "database-path","d", node.dbPath, "The path of the blockchain's json file")
+	
 	startCmd.Flags().StringVarP(&node.brokerURL, "broker-url", "k", node.brokerURL, "The adress and port of the kafka broker")
 	startCmd.Flags().IntVarP(&node.nodes, "nodes", "N", node.nodes, "The number of nodes")
 
