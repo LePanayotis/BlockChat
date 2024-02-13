@@ -12,18 +12,16 @@ import (
 	"strconv"
 )
 
-//The basic struct representing the transactions in BlockChat
-//`SenderAddress` and `ReiceiverAddress` are the public keys of
-//the sender and the receiver of the transaction respectively,
-//whether it is a simple message or a transfer transaction.
-//
-//The `TypeOfTransaction` can have the values: "message" or "transfer" 
-//The property `Message` bears the content of the message and the
-//property `Amount` represents the amount of BlockChatCoins to be transferred
-//
-//`TransactionId` is the hash of the string representation of the transaction
-//as defined in GetConcat method.
-//`Signature` is the encrypted `TransactionId` with the private key of the sender
+// The basic struct representing the transactions in BlockChat
+// `SenderAddress` and `ReiceiverAddress` are the public keys of
+// the sender and the receiver of the transaction respectively,
+// whether it is a simple message or a transfer transaction.
+// The `TypeOfTransaction` can have the values: "message" or "transfer" 
+// The property `Message` bears the content of the message and the
+// property `Amount` represents the amount of BlockChatCoins to be transferred
+// `TransactionId` is the hash of the string representation of the transaction
+// as defined in GetConcat method.
+// `Signature` is the encrypted `TransactionId` with the private key of the sender
 type Transaction struct {
 	SenderAddress      string  `json:"sender_address"`
 	ReceiverAddress    string  `json:"receiver_address"`
@@ -35,24 +33,24 @@ type Transaction struct {
 	Signature           string  `json:"Signature"`
 }
 
-//Creates a new message transaction instance
-//Sender's private key is required to sign the transaction
+// Creates a new message transaction instance
+// Sender's private key is required to sign the transaction
 func NewMessageTransaction(_senderAddress string, _receiverAddress string, _message string,
 	_nonce uint, _privateKey string) Transaction {
 
 	return newTransactionInstance(_senderAddress, _receiverAddress, "message", 0, _message, _nonce, _privateKey)
 }
 
-//Creates a new transfer transaction instance
-//Sender's private key is required to sign the transaction
+// Creates a new transfer transaction instance
+// Sender's private key is required to sign the transaction
 func NewTransferTransaction(_senderAddress string, _receiverAddress string, _amount float64,
 	_nonce uint, _privateKey string) Transaction {
 
 	return newTransactionInstance(_senderAddress, _receiverAddress, "transfer", _amount, "", _nonce, _privateKey)
 }
 
-//Returns the transaction in json string representation
-//and error if the parsing fails
+// Returns the transaction in json string representation
+// and error if the parsing fails
 func (t *Transaction) JSONify() (string, error) {
 
 	if !t.IsValid() {
@@ -71,25 +69,25 @@ func (t *Transaction) JSONify() (string, error) {
 }
 
 
-//Checks if transaction `t` is valid. This means:
-//
-//`t`'s `SenderAddress` and `ReceiverAddress` are not empty strings
-//
-//`Amount` is not negative
-//
-//`TypeOfTransaction` is either "trasfer" or "message"
-//
+// Checks if transaction `t` is valid. This means:
+// `t`'s `SenderAddress` and `ReceiverAddress` are not empty strings
+// `Amount` is not negative
+// `TypeOfTransaction` is either "trasfer" or "message"
 func (t *Transaction) IsValid() bool {
+	// Checks addresses not empty and amount non negative
 	if t.SenderAddress == "" ||
 		t.ReceiverAddress == "" ||
 		t.Amount < 0 {
 		return false
 	}
+
+	// Transfers have positive amounts and empty string messages
 	if t.TypeOfTransaction == "transfer" &&
 		t.Amount > 0 &&
 		t.Message == "" {
 			return true
 	} else if t.TypeOfTransaction == "message" &&
+		// Messages have non-empty message content and zero amount, and can't be sent or received by "0" wallet
 		t.Message != "" &&
 		t.Amount == 0 && (t.ReceiverAddress != "0" && t.SenderAddress != "0") {
 			return true
@@ -98,11 +96,10 @@ func (t *Transaction) IsValid() bool {
 }
 
 
-//Returns a Transaction instance from a json string
-//Error if parsing fails
+// Returns a Transaction instance from a json string
+// Error if parsing fails
 func ParseTransactionJSON(s string) (Transaction, error) {
 	var t Transaction
-
 	if err := json.Unmarshal([]byte(s), &t); err != nil {
 		return t, err
 	}
@@ -110,12 +107,13 @@ func ParseTransactionJSON(s string) (Transaction, error) {
 
 }
 
-//Fundamental function to create a new Transaction instance from the given parameters
+// Fundamental function to create a new Transaction instance from the given parameters
 func newTransactionInstance(_senderAddress string, _receiverAddress string,
 	_typeOfTransaction string, _amount float64, _message string,
-	_nonce uint, _private_key string) Transaction {
+	_nonce uint, _privateKey string) Transaction {
 
 	var t Transaction
+	// Sets instance's fields
 	t.SenderAddress = _senderAddress
 	t.ReceiverAddress = _receiverAddress
 	t.TypeOfTransaction = _typeOfTransaction
@@ -123,7 +121,8 @@ func newTransactionInstance(_senderAddress string, _receiverAddress string,
 	t.Nonce = _nonce
 	t.Message = _message
 	
-	_, err := t.Sign(_private_key)
+	// Signs transaction
+	_, err := t.Sign(_privateKey)
 	if err != nil {
 		return Transaction{}
 	}
@@ -131,7 +130,7 @@ func newTransactionInstance(_senderAddress string, _receiverAddress string,
 }
 
 
-//Returns a concatenation of basic properties of the transactions
+// Returns a concatenation of basic properties of the transactions
 func (t *Transaction) GetConcat() string {
 	concat := t.SenderAddress + t.ReceiverAddress + t.TypeOfTransaction + strconv.FormatFloat(t.Amount, 'f', -1, 64) + strconv.Itoa(int(t.Nonce)) + t.Message
 	return concat
@@ -155,32 +154,38 @@ func (t *Transaction) SetHash(_hash [32]byte) (string, error) {
 
 //Signs the transaction with the given private key
 func (t *Transaction) Sign(_privateKey string) (string, error) {
+	// Get's transaction's hash
 	transactionHash, err := t.GetHash()
 	if err != nil {
 		return "", err
 	}
+	// Assigns hash to appropriate fields
 	_, err = t.SetHash(transactionHash)
 	if err != nil {
 		return "", err
 	}
 
+	// Decodes private key string to bytes
 	privateKeyArray, err := hex.DecodeString(_privateKey)
 	if err != nil {
 		return "", err
 	}
 
+	// Makes key out of private key byte array
 	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyArray)
 	if err != nil {
 		return "", err
 	}
 
-	signature_bytes, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, transactionHash[:])
+	// Signs hash
+	signatureBytes, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, transactionHash[:])
 	if err != nil {
 		return "", err
 	}
 
-	signature := hex.EncodeToString(signature_bytes)
-
+	// Gets signature string
+	signature := hex.EncodeToString(signatureBytes)
+	// Assigns signature to field
 	t.Signature = signature
 
 	return signature, nil
@@ -191,9 +196,11 @@ func (t *Transaction) Sign(_privateKey string) (string, error) {
 //Checks if transaction properties values conform to the constraints
 //Then verifies signature with the sender's public key
 func (t *Transaction) Verify() (bool) {
+	// A Verified transaction must be valid (obey the constraints)
 	if (!t.IsValid()){
 		return false
 	}
+	// Calculates hash
 	producedHash, err := t.GetHash()
 	if err != nil {
 		return false
@@ -205,7 +212,6 @@ func (t *Transaction) Verify() (bool) {
 	}
 
 	var publicKeyString string
-
 	if t.SenderAddress == "0" {
 		//If sender is genesis block, then t is signed with bootstrap node keys
 		publicKeyString = t.ReceiverAddress
@@ -217,20 +223,18 @@ func (t *Transaction) Verify() (bool) {
 	if err != nil {
 		return false
 	}
-
+	// Makes public key
 	publicKey, err := x509.ParsePKCS1PublicKey(publicKeyArray[:])
 	if err != nil {
 		return false
 	}
 
+	// Verifies that the decrypted signature equals the produced hash
 	err = rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, producedHash[:], signature[:])
 
 	return err == nil
 }
 
-
-
-// var node only used here:
 //Calculates the fee based on the type of the transaction
 func (t *Transaction) CalcFee() float64 {
 	if t.SenderAddress == "0" || t.ReceiverAddress == "0" {
@@ -243,10 +247,14 @@ func (t *Transaction) CalcFee() float64 {
 	return 0
 }
 
+
+// Creates message transaction with node's configuration
 func (node *nodeConfig) NewMessageTransaction(_receiverAddress string, _message string) Transaction{
 	node.outboundNonce++
 	return newTransactionInstance(node.publicKey, _receiverAddress, "message", 0, _message, node.outboundNonce, node.privateKey)
 }
+
+// Creates transfer transaction with node's configuration
 func (node *nodeConfig) NewTransferTransaction(_receiverAddress string, _amount float64) Transaction{
 	node.outboundNonce++
 	return newTransactionInstance(node.publicKey, _receiverAddress, "transfer", _amount, "", node.outboundNonce, node.privateKey)

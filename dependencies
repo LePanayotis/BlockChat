@@ -1,2 +1,0 @@
-go get github.com/segmentio/kafka-go
-go get "github.com/joho/godotenv"

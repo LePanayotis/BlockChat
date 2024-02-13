@@ -66,6 +66,7 @@ func (node *nodeConfig) broadcastBlock(b *Block) error {
 }
 
 // Broadcasts the initial blockchain and the nodes array of the cluster
+// and performs blockchain and databse updates
 func (node *nodeConfig) broadcastWelcome() error {
 
 	// Creates new block to share genesis block amount with other nodes
@@ -78,19 +79,22 @@ func (node *nodeConfig) broadcastWelcome() error {
 		// Creates transaction granting node initialBCC
 		// outbound nonce is increased in node.NewTransferTransaction
 		tx := node.NewTransferTransaction(receiver,initialBCC)
-
-		// Increases nonce in database
-		node.increaseNonce()
 		// Adds transaction to the curret block
 		block.AddTransaction(&tx)
+		// Increases nonce in database
+		node.increaseNonce()
 	}
 	
 	// Calculates validator and hash
-	block.Validator = block.CalcValidator()
+	block.Validator = node.CalcValidator(&block)
 	block.CalcHash()
 
 	// Appends block to blockchain
-	node.blockchain.AddBlock(&block)
+	err := node.addBlock(&block)
+	if err != nil {
+		logger.Error("Failed to add block to blockchain", "error",err)
+		return err
+	}
 
 	// Creates message struct to broadcast
 	// blockchain to the other nodes

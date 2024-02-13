@@ -6,25 +6,11 @@ import (
 	"os"
 )
 
+// The Blockchain is just a chain of blocks:
+// We name it blockchain for convenience
 type Blockchain []Block
 
-func (node *nodeConfig) LoadBlockchain() (Blockchain, error) {
-	content, err := os.ReadFile(node.blockchainPath)
-	if err != nil {
-		return nil, err
-	}
-	var blockchain Blockchain
-	if err := json.Unmarshal(content, &blockchain); err != nil {
-		return nil, err
-	}
-	_, isValid := node.IsBlockchainValid()
-	if isValid {
-		return blockchain, nil
-	}
-	return blockchain, errors.New("Blockchain not valid")
-
-}
-
+// Method that writes the blockchain to the indicated path
 func (B *Blockchain) WriteBlockchain(_path string) error {
 
 	file, err := os.Create(_path)
@@ -43,55 +29,48 @@ func (B *Blockchain) WriteBlockchain(_path string) error {
 	return nil
 }
 
-
-
-
+// Writes blockchain to file indicated in node configuration
 func (node *nodeConfig) WriteBlockchain() error {
-	err := node.blockchain.WriteBlockchain(node.blockchainPath)
-	if err != nil {
-		return err
-	}
-	return nil
-
+	return node.blockchain.WriteBlockchain(node.blockchainPath)
 }
 
-func  (B *Blockchain) IsValid(_previousHash string)(int, bool) {
+func (node *nodeConfig) IsBlockchainValid() (int, bool) {
+	previousHash := genesisHash	
 	boolState := true
 	i := 0
-	for _, block := range *B {
-		boolState = boolState && block.IsValid(_previousHash) && block.Index == i
-		_previousHash = block.CurrentHash
+
+	// Checks each block in the blockchain
+	for _, block := range node.blockchain {
+		// Checks if block is valid and has the expected index
+		boolState = boolState && node.IsBlockValid(&block, previousHash) && block.Index == i
+		// New previous hash
+		previousHash = block.CurrentHash
+
+		// Increases expected index
 		i++
+
+		// If block not valid break and set i to index of last valid block
 		if !boolState {
 			i--
 			break
 		}
 	}
+	// Returns validity and last valid block in blockchain
 	return i, boolState
 }
 
-func  (node * nodeConfig) IsBlockchainValid()(int, bool) {
-	return node.blockchain.IsValid(genesisHash)
-}
-
-// Need to change this
-func (node * nodeConfig) MakeDB()  error {
-	index, _ := node.IsBlockchainValid()
-	B := &node.blockchain
-	node.myDB = make(DBmap)
-	for i := 0; i < index; i++ {
-		block := (*B)[i]
-		err := node.addBlockToDB(&block)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // Appends valid block to blockchain
-func (B *Blockchain) AddBlock(_block *Block) error {
-	if _block.IsValid((*B)[len(*B)-1].CurrentHash) && _block.Index == len(*B) {
+func (node *nodeConfig) addBlock(_block *Block) error {
+
+	B := &node.blockchain
+
+	// If blockchain empty and block index equals 0, append block. Check its own previous hash
+	if len(*B) == 0 && _block.Index == 0 && node.IsBlockValid(_block, _block.PreviousHash) {
+		*B = append(*B, *_block)
+		return nil
+
+	// If blockchain not empty and block index equals length of blockchain, append block
+	} else if node.IsBlockValid(_block, (*B)[len(*B)-1].CurrentHash) && _block.Index == len(*B) {
 		*B = append(*B, *_block)
 		return nil
 	}

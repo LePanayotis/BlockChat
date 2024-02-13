@@ -1,15 +1,15 @@
 package blockchat
 
 import (
-	"context"
 	"encoding/json"
 	"time"
+	"context"
 	"github.com/segmentio/kafka-go"
 )
 
+// Actions performed when an ordinary node (id != 0) enters the cluster
 func (node *nodeConfig) ordinaryNodeEnter() error {
-
-
+	// Creates consumer for "welcome" topic
 	var r *kafka.Reader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     []string{node.brokerURL},
 		Topic:       "welcome",
@@ -17,62 +17,76 @@ func (node *nodeConfig) ordinaryNodeEnter() error {
 		GroupID:     node.idString,
 	})
 
-	logger.Info("Kafka producer and welcome consumer connected")
+	logger.Info("Kafka welcome consumer connected")
 
+	// Posts node existence to bootstrap node
 	err := node.declareExistence()
 	if err != nil {
-		logger.Error("Could not declare existence to other nodes", err)
+		logger.Error("Could not declare existence to other nodes", "error",err)
 		return err
 	}
+	logger.Info("Successfully broadcasted existence")
 
-	logger.Info("Broadcasted existence to other nodes")
-
+	// Loop wait for valid welcome message
 	for {
-
+		// Get welcome message
 		m, err := r.ReadMessage(context.Background())
 		if err != nil {
-			logger.Error("Node could not get welcome message", err)
+			logger.Error("Node could not get welcome message", "error",err)
 			continue
 		}
 		logger.Info("Received welcome message")
 
-		t, _ := time.Parse(timeFormat, node.startTime)
+		// Check welcome message created after this node started
+		t, err := time.Parse(timeFormat, node.startTime)
+		if err != nil {
+			logger.Warn("Could not parse start time, skips transaction")
+			continue
+		}
 		if m.Time.Before(t) {
-			logger.Error("Received messages created before","node start time",node.startTime, "welcome received",m.Time.Format(timeFormat))
+			// If received old welcome, continue to next iteration
+			logger.Warn("Received messages created before","node start time",node.startTime, "welcome received",m.Time.Format(timeFormat))
 			continue
 		}
 
+		// Parse welcome message containing blockchain and node-wallet addresses
 		var welcomeMessage welcomeMessage
 		err = json.Unmarshal(m.Value, &welcomeMessage)
 		if err != nil {
-			logger.Error("Parsing welcome message failed", err)
+			logger.Error("Parsing welcome message failed", "error",err)
 			return err
 		}
 		logger.Info("Successfully parsed welcome message")
 
+		// Set node blockchain to received one
 		node.blockchain = welcomeMessage.Bc
+		// Set id array to received one
 		node.idArray = welcomeMessage.NodesIn[:]
+		// Update the map with received mapping
 		for id, key := range node.idArray {
 			node.nodeMap[key] = id
 		}
 
-		node.WriteBlockchain()
+		// Write blockchain to file
+		err = node.WriteBlockchain()
 		if err != nil {
-			logger.Error("Could not write blockchain", err)
+			logger.Error("Could not write blockchain", "error",err)
 			return err
 		}
 		logger.Info("Successfully wrote blockchain to file")
 
+		// Turn blockchain to database
 		err = node.MakeDB()
 		if err != nil {
-			logger.Error("Creating database from blockchain failed", err)
+			logger.Error("Creating database from blockchain failed", "error",err)
 			return err
 		}
 		logger.Info("Successfully created database")
 
+		// Write database to file
 		err = node.WriteDB()
 		if err != nil {
-			logger.Error("Could not write database to file", err)
+			logger.Error("Could not write database to file", "error",err)
 			return err
 		}
 		logger.Info("Successfully stored database in file")
@@ -80,193 +94,114 @@ func (node *nodeConfig) ordinaryNodeEnter() error {
 		break
 	}
 
-	go func() {
-		r.Close()
-	}()
+	// Close welcome reader in parallel
+	go r.Close()
+
 	return nil
 }
-
+// Actions performed when the bootstrap node (id == 0) enters
 func (node *nodeConfig) bootstrapNodeEnter() error {
 	var err error
-	var myBlockchain *Blockchain = &node.blockchain
-		//Creates genesis block
+
+		// Creates genesis block
 		genesis := node.GenesisBlock()
 		logger.Info("Genesis block created")
 
-		//Appends genesis to blockchain
-		*myBlockchain = append(*myBlockchain, genesis)
+		// Appends genesis to blockchain
+		node.blockchain = append(node.blockchain, genesis)
 
-		//Writes blockchain json to output file
+		// Writes blockchain json to output file
 		err = node.WriteBlockchain()
 		if err != nil {
-			logger.Error("Could not write genesis blockchain", err)
+			logger.Error("Could not write genesis blockchain", "error",err)
 			return err
 		}
 		logger.Info("Blockchain written successfully")
 
+		// Makes database from blockchain
 		err = node.MakeDB()
 		if err != nil {
-			logger.Error("Could not make DB from genesis blockchain", err)
-			return err
-		}
-		err = node.WriteDB()
-		if err != nil {
-			logger.Error("Could not store bootstrap db to file", err)
+			logger.Error("Could not make DB from genesis blockchain", "error",err)
 			return err
 		}
 
+		// Stores database to file
+		err = node.WriteDB()
+		if err != nil {
+			logger.Error("Could not store bootstrap db to file","error",err)
+			return err
+		}
+
+		// Starts collect node procedure
 		err = node.collectNodesInfo()
 		if err != nil {
-			logger.Error("Could not collect nodes info", err)
+			logger.Error("Could not collect nodes info", "error",err)
 		}
 		return nil
 }
 
-func (node *nodeConfig) blockListener() error {
 
-	block, validator, err := node.getNewBlock()
-	if err != nil {
-		logger.Warn("Block listener exiting")
-		return err
-	}
-	logger.Info("Received new block")
+// Initial point of node process
+func (node *nodeConfig) Start() error {
+	
+	// Set remaining parameters necessary for function as node (not CLI)
+	node.initialConfig()
 
-	if node.currentBlock.CurrentHash == block.CurrentHash {
-
-		node.blockchain = append(node.blockchain, block)
-		node.currentBlock = node.NewBlock()
-
-		logger.Info("New block accepted", "validator node:", validator)
-
-		err = node.addBlockUndoStake(&block)
-		if err != nil {
-			logger.Error("Failed adding block to database", err)
-			return err
-		}
-
-		err = node.WriteDB()
-		if err != nil {
-			logger.Error("Failed writing database", err)
-			return err
-		}
-		err = node.WriteBlockchain()
-		if err != nil {
-			logger.Error("Failed writing blockchain", err)
-			return err
-		}
-
-		logger.Info("Block add routine completed")
-
-	} else {
-		logger.Warn("Block rejected")
-	}
-	return nil
-}
-
-func (node *nodeConfig) transactionListener() error {
-
-	for {
-		tx, err := node.getNewTransaction()
-		if err != nil {
-			logger.Warn("Transaction listener exiting")
-			return err
-		}
-		
-		if !tx.Verify() {
-			logger.Warn("Transaction not verified")
-			continue
-		}
-		logger.Info("New transaction received")
-		if node.isTransactionPossible(&tx) {
-
-			if len(node.currentBlock.Transactions) < node.capacity {
-
-				_, err = node.addTransactionToDB(&tx)
-				if err != nil {
-					logger.Error("Failed adding transaction to database", err)
-					return err
-				}
-				logger.Info("Transaction added to database")
-
-				transactionsInBlock := node.currentBlock.AddTransaction(&tx)
-
-				if transactionsInBlock == node.capacity {
-					logger.Info("Block capacity reached")
-
-					node.currentBlock.SetValidator()
-					node.currentBlock.CalcHash()
-
-					if node.currentBlock.Validator == node.id {
-						logger.Info("The node is broadcaster")
-						node.currentBlock.Timestamp = time.Now().UTC().Format(timeFormat)
-						err = node.broadcastBlock(&node.currentBlock)
-						if err != nil {
-							logger.Error("Failed to broadcast new block", err)
-							return err
-						}
-						logger.Info("Block broadcasted by me")
-					}
-					err = node.blockListener()
-					if err != nil {
-						logger.Error("Experiment failed")
-						return err
-					}
-				}
-			} else {
-				logger.Warn("Capacity Reached")
-				return nil
-			}
-
-		} else {
-			logger.Warn("Transaction rejected")
-			if tx.SenderAddress == node.publicKey {
-				logger.Warn("My nonce is decreased by one")
-				node.outboundNonce--
-
-			}
-		}
-	}
-}
-
-func StartNode() error {
-	startConfig()
-
+	// Check whether node is bootsrap or ordinary
 	if node.id == 0 {
-		//Case bootstrap node
+		// Case bootstrap node
 		logger.Info("Node is bootstrap node")
+		// Perform bootstrap stuff
 		err := node.bootstrapNodeEnter()
 		if err != nil {
-			logger.Error("Error in starting bootsrap node", err)
+			logger.Error("Error in starting bootsrap node", "error",err)
 			return err
 		}
-
 	} else {
+		// Case ordinary node
 		logger.Info("Node is ordinary")
+		// Perform ordinary stuff
 		err := node.ordinaryNodeEnter()
 		if err != nil {
-			logger.Error("Could not enter the cluster", err)
+			logger.Error("Could not enter the cluster", "error",err)
 			return err
 		}
 	}
-	//Start node kafka consumers and writers
-	node.txConsumer = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{node.brokerURL},
-		Topic:       "post-transaction",
-		StartOffset: kafka.LastOffset,
-		GroupID:     node.idString,
-	})
-	node.blockConsumer = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{node.brokerURL},
-		Topic:       "post-block",
-		StartOffset: kafka.LastOffset,
-		GroupID:     node.idString,
-	})
+	return node.startListeners()
+}
 
-	logger.Info("Created post-transaction and post-block readers")
+// Performed by all nodes when the welcome message is sent by bootstrap
+func (node *nodeConfig) startListeners() error {
+		// Start kafka consumers
+		// Consumer for "post-transaction" topic
+		node.txConsumer = kafka.NewReader(kafka.ReaderConfig{
+			Brokers:     []string{node.brokerURL},
+			Topic:       "post-transaction",
+			StartOffset: kafka.LastOffset,
+			GroupID:     node.idString,
+		})
+		// On exit, close consumer
+		defer node.txConsumer.Close()
+		// Consumer for "post-block" topic
+		node.blockConsumer = kafka.NewReader(kafka.ReaderConfig{
+			Brokers:     []string{node.brokerURL},
+			Topic:       "post-block",
+			StartOffset: kafka.LastOffset,
+			GroupID:     node.idString,
+		})
+		// On exit, close consumer
+		defer node.blockConsumer.Close()
 	
-	node.currentBlock = node.NewBlock()
-	//node.blockIndex++
-	go node.startRPC()
-	node.transactionListener()
-	return nil
+		logger.Info("Created post-transaction and post-block consumers")
+		// Create's node new current block
+		node.currentBlock = node.NewBlock()
+
+		// Listens in parallel for remote procedure calls by CLI
+		go node.startRPC()
+		if node.useCLI {
+			go node.startCLI()
+		}
+
+		// Listen for transactions posted to the kafka broker
+		return node.transactionListener()
 }

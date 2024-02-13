@@ -7,6 +7,8 @@ services:
       - ./.env
     networks:
       - cluster
+    ports:
+      - "1500:1500"
 
   node1:
     image: blockchat
@@ -16,8 +18,95 @@ services:
       - ./.env
     networks:
       - cluster
-    depends_on:
-      - node0
+    ports:
+      - "1501:1500"
+
+  node2:
+    image: blockchat
+    environment:
+      - NODE_ID=2
+    env_file:
+      - ./.env
+    networks:
+      - cluster
+    ports:
+      - "1502:1500"
+
+  node3:
+    image: blockchat
+    environment:
+      - NODE_ID=3
+    env_file:
+      - ./.env
+    networks:
+      - cluster
+    ports:
+      - "1503:1500"
+
+  node4:
+    image: blockchat
+    environment:
+      - NODE_ID=4
+    env_file:
+      - ./.env
+    networks:
+      - cluster
+    ports:
+      - "1504:1500"
+    
+  node5:
+    image: blockchat
+    environment:
+      - NODE_ID=5
+    env_file:
+      - ./.env
+    networks:
+      - cluster
+    ports:
+    - "1505:1500"
+  
+  node6:
+    image: blockchat
+    environment:
+      - NODE_ID=6
+    env_file:
+      - ./.env
+    networks:
+      - cluster
+    ports:
+    - "1506:1500"
+
+  node7:
+    image: blockchat
+    environment:
+      - NODE_ID=7
+    env_file:
+      - ./.env
+    networks:
+      - cluster
+    ports:
+    - "1507:1500"
+
+  node8:
+    image: blockchat
+    environment:
+      - NODE_ID=8
+    env_file:
+      - ./.env
+    networks:
+      - cluster
+    ports:
+    - "1508:1500"
+  node9:
+    image: blockchat
+    environment:
+      - NODE_ID=9
+    env_file:
+      - ./.env
+    networks:
+      - cluster
+    ports:
+    - "1509:1500"
 
 networks:
   cluster:

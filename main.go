@@ -8,10 +8,13 @@ import (
 
 func main() {
 	godotenv.Load()
-	rootCmd := blockchat.RootCmd
-	blockchat.ConfigApp()
+
+
+	rootCmd := blockchat.ConfigCommands()
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 
 }
+

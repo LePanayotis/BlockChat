@@ -5,11 +5,16 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 )
 
 // Returns RSA public and private keys in string format
 func generateKeys() (string, string) {
-	key, _ := rsa.GenerateKey(rand.Reader, keyLength)
+	key, err := rsa.GenerateKey(rand.Reader, keyLength)
+	if err != nil { 
+		logger.Error("Failed to generate RSA key", "error",err)
+		return "", ""
+	}
 	priv := hex.EncodeToString(x509.MarshalPKCS1PrivateKey(key))
 	pub := hex.EncodeToString(x509.MarshalPKCS1PublicKey(&key.PublicKey))
 	return pub, priv
@@ -32,8 +37,9 @@ func (node * nodeConfig) generateKeysUpdate() (string, string) {
 }
 
 // Util function to close open connections of kafka producers and consumers
-func (node *nodeConfig) closeKafka() {
-	node.writer.Close()
-	node.txConsumer.Close()
-	node.blockConsumer.Close()
+func (node *nodeConfig) closeKafka() error{
+	return errors.Join(
+		node.writer.Close(),
+	 	node.txConsumer.Close(),
+	 	node.blockConsumer.Close())
 }

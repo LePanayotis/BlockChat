@@ -3,7 +3,7 @@
   "configurations": [
     
     {
-      "name": "Launch-NODE1",
+      "name": "Launch-NODE",
       "type": "go",
       "request": "launch",
       "mode": "auto",
@@ -12,15 +12,15 @@
       "args": [
         "start",
         "-n",
-        "1",
+        "0",
         "-N",
         "2",
         "--blockchain-path",
-        "blockchain1.json",
+        "blockchain0.json",
         "-s",
-        ":1501",
+        "localhost:1500",
         "--database-path",
-        "db1.json"
+        "db0.json"
       ]
     },
     {
@@ -42,6 +42,27 @@
         ":1500",
         "--database-path",
         "db.json"
+      ]
+    },
+    {
+      "name": "Launch-NODE4",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "C:\\Users\\ppapa\\Desktop\\go\\BlockChat",
+      "env": {},
+      "args": [
+        "start",
+        "-n",
+        "3",
+        "-N",
+        "4",
+        "--blockchain-path",
+        "blockchain3.json",
+        "-s",
+        ":1503",
+        "--database-path",
+        "db3.json"
       ]
     }
   ]
