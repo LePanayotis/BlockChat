@@ -22,4 +22,4 @@ go.work
 go.sum
 scripts.bat
 *.ps1
-.vscode
+.vscode/
