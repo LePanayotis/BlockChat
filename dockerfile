@@ -2,21 +2,24 @@
 FROM golang:1.22-alpine
 
 # Set the working directory inside the container
-WORKDIR /app
+WORKDIR /opt/blockchat/src
 
 # Copy the current directory contents into the container at /app
-COPY . /app
-RUN mkdir /app/bin
+COPY ./main.go /opt/blockchat/src/main.go
+COPY ./go.mod /opt/blockchat/src/go.mod
+COPY ./blockchat /opt/blockchat/src/blockchat
+
 # Download and install any required dependencies
+RUN go mod tidy
 RUN go mod download
 
 # Build the Go application
-RUN go build -o /app/bin/blockchat .
-
-ENV PATH="/app/bin/:$PATH"
-
-# Expose port 8080 to the outside world
-EXPOSE 8080
-
+RUN go build -o /opt/blockchat/blockchat .
+RUN rm -rf /opt/blockchat/src
+COPY ./input /opt/blockchat/input
+ENV PATH="/opt/blockchat/:$PATH"
+# Expose port 1500 to the outside world
+EXPOSE 1500
+WORKDIR /opt/blockchat
 # Command to run the executable
 CMD ["blockchat","start"]

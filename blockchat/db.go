@@ -145,7 +145,7 @@ func (db *DBmap) addTransaction(_tx *Transaction, _senderId int, _receiverId int
 	// If sender is not "0" wallet
 	if _senderId != -1 {
 		//Check if the nonce of the transaction is the expected one as in the database
-		if _tx.Nonce == (*db)[_senderId].CurentNonce+1 {
+		if _tx.Nonce > (*db)[_senderId].CurentNonce {
 			// If nonce okey, increases the nonce in database
 			db.increaseNonce(_senderId)
 		} else {
@@ -169,7 +169,7 @@ func (db *DBmap) addTransaction(_tx *Transaction, _senderId int, _receiverId int
 	}
 
 	// Appends the message
-	if _tx.TypeOfTransaction == "message" {
+	if _tx.Type == "message" {
 		db.addMessage(_receiverId, Message{
 			Sender:  _senderId,
 			Nonce:   _tx.Nonce,

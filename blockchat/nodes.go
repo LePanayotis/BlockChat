@@ -198,10 +198,14 @@ func (node *nodeConfig) startListeners() error {
 
 		// Listens in parallel for remote procedure calls by CLI
 		go node.startRPC()
+		if node.inputPath != "" {
+			go node.sendInputTransactions()
+		}
 		if node.useCLI {
 			go node.startCLI()
 		}
 
 		// Listen for transactions posted to the kafka broker
 		return node.transactionListener()
+
 }

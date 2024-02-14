@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -16,20 +17,20 @@ import (
 // `SenderAddress` and `ReiceiverAddress` are the public keys of
 // the sender and the receiver of the transaction respectively,
 // whether it is a simple message or a transfer transaction.
-// The `TypeOfTransaction` can have the values: "message" or "transfer" 
+// The `Type` can have the values: "message" or "transfer"
 // The property `Message` bears the content of the message and the
 // property `Amount` represents the amount of BlockChatCoins to be transferred
-// `TransactionId` is the hash of the string representation of the transaction
+// `Id` is the hash of the string representation of the transaction
 // as defined in GetConcat method.
-// `Signature` is the encrypted `TransactionId` with the private key of the sender
+// `Signature` is the encrypted `Id` with the private key of the sender
 type Transaction struct {
 	SenderAddress      string  `json:"sender_address"`
 	ReceiverAddress    string  `json:"receiver_address"`
-	TypeOfTransaction string  `json:"type_of_transaction"`
+	Type string  `json:"type_of_transaction"`
 	Amount              float64 `json:"amount"`
 	Message             string  `json:"message"`
 	Nonce               uint    `json:"nonce"`
-	TransactionId      string  `json:"transaction_id"`
+	Id      string  `json:"transaction_id"`
 	Signature           string  `json:"Signature"`
 }
 
@@ -72,7 +73,7 @@ func (t *Transaction) JSONify() (string, error) {
 // Checks if transaction `t` is valid. This means:
 // `t`'s `SenderAddress` and `ReceiverAddress` are not empty strings
 // `Amount` is not negative
-// `TypeOfTransaction` is either "trasfer" or "message"
+// `Type` is either "trasfer" or "message"
 func (t *Transaction) IsValid() bool {
 	// Checks addresses not empty and amount non negative
 	if t.SenderAddress == "" ||
@@ -82,11 +83,11 @@ func (t *Transaction) IsValid() bool {
 	}
 
 	// Transfers have positive amounts and empty string messages
-	if t.TypeOfTransaction == "transfer" &&
+	if t.Type == "transfer" &&
 		t.Amount > 0 &&
 		t.Message == "" {
 			return true
-	} else if t.TypeOfTransaction == "message" &&
+	} else if t.Type == "message" &&
 		// Messages have non-empty message content and zero amount, and can't be sent or received by "0" wallet
 		t.Message != "" &&
 		t.Amount == 0 && (t.ReceiverAddress != "0" && t.SenderAddress != "0") {
@@ -109,14 +110,14 @@ func ParseTransactionJSON(s string) (Transaction, error) {
 
 // Fundamental function to create a new Transaction instance from the given parameters
 func newTransactionInstance(_senderAddress string, _receiverAddress string,
-	_typeOfTransaction string, _amount float64, _message string,
+	_Type string, _amount float64, _message string,
 	_nonce uint, _privateKey string) Transaction {
 
 	var t Transaction
 	// Sets instance's fields
 	t.SenderAddress = _senderAddress
 	t.ReceiverAddress = _receiverAddress
-	t.TypeOfTransaction = _typeOfTransaction
+	t.Type = _Type
 	t.Amount = _amount
 	t.Nonce = _nonce
 	t.Message = _message
@@ -132,7 +133,7 @@ func newTransactionInstance(_senderAddress string, _receiverAddress string,
 
 // Returns a concatenation of basic properties of the transactions
 func (t *Transaction) GetConcat() string {
-	concat := t.SenderAddress + t.ReceiverAddress + t.TypeOfTransaction + strconv.FormatFloat(t.Amount, 'f', -1, 64) + strconv.Itoa(int(t.Nonce)) + t.Message
+	concat := t.SenderAddress + t.ReceiverAddress + t.Type + strconv.FormatFloat(t.Amount, 'f', -1, 64) + strconv.Itoa(int(t.Nonce)) + t.Message
 	return concat
 }
 
@@ -145,10 +146,10 @@ func (t *Transaction) GetHash() ([32]byte, error) {
 }
 
 
-//Sets the `TransactionId`
+//Sets the `Id`
 func (t *Transaction) SetHash(_hash [32]byte) (string, error) {
-	t.TransactionId = hex.EncodeToString(_hash[:])
-	return t.TransactionId, nil
+	t.Id = hex.EncodeToString(_hash[:])
+	return t.Id, nil
 }
 
 
@@ -239,9 +240,9 @@ func (t *Transaction) Verify() (bool) {
 func (t *Transaction) CalcFee() float64 {
 	if t.SenderAddress == "0" || t.ReceiverAddress == "0" {
 		return 0
-	} else if (t.TypeOfTransaction =="transfer") {
+	} else if (t.Type =="transfer") {
 		return t.Amount*feePercentage
-	} else if (t.TypeOfTransaction =="message"){
+	} else if (t.Type =="message"){
 		return float64(len(t.Message)*costPerChar)
 	}
 	return 0
@@ -258,4 +259,34 @@ func (node *nodeConfig) NewMessageTransaction(_receiverAddress string, _message 
 func (node *nodeConfig) NewTransferTransaction(_receiverAddress string, _amount float64) Transaction{
 	node.outboundNonce++
 	return newTransactionInstance(node.publicKey, _receiverAddress, "transfer", _amount, "", node.outboundNonce, node.privateKey)
+}
+
+func (node *nodeConfig) logTransaction(_logInfo string, _tx *Transaction) {
+
+	nonce, amount, message, id := _tx.Nonce, _tx.Amount, _tx.Message ,_tx.Id
+	var sender, receiver string
+
+	fmt.Print()
+	senderId, b := node.nodeMap[_tx.SenderAddress]
+	if !b && _tx.SenderAddress != "0" {
+		logger.Error("Requested to log transaction with unresoluted sender wallet address owner node","sender",_tx.SenderAddress)
+		return
+	} 
+	sender = strconv.Itoa(senderId)
+	receiverId, b := node.nodeMap[_tx.ReceiverAddress]
+	if !b && _tx.ReceiverAddress != "0" {
+		logger.Error("Requested to log transaction with unresoluted receiver node wallet addres","receiver",_tx.ReceiverAddress)
+		return
+	}
+	receiver = strconv.Itoa(receiverId)
+	if _tx.SenderAddress == "0" {
+		logger.Info("Genesis transaction","to",receiver,"amount",amount,"nonce",nonce, "tid",id)
+		return
+	}
+	if _tx.ReceiverAddress == "0" {
+		logger.Info(_logInfo, "type","stake","from", sender,"amount",amount, "nonce",nonce,"tid",id)
+		return
+	}
+	logger.Info(_logInfo,"type",_tx.Type,"from",sender,"to",receiver,"amount",amount,"message",message,"nonce",nonce, "tid",id)
+
 }

@@ -1,7 +1,6 @@
 package blockchat
 
 import (
-	"log/slog"
 	"os"
 	"strconv"
 	"time"
@@ -17,6 +16,9 @@ type nodeConfig struct {
 	// Instance essentials
 	blockchainPath string // The path where the blockchain json representation is stored, can be absolute or relative
 	dbPath         string // The path where the database json representation is stored, can be absolute or relative
+	inputPath      string // The path where the transactions input is stored, can be absolute or relative
+	logPath string // The path where the
+	defaultStake float64
 
 	id       int            // Node id varying from 0 to nodes-1 (number of nodes in cluster-1)
 	idString string         // String representation of node id (above)
@@ -94,6 +96,14 @@ func (node *nodeConfig) EnvironmentConfig() error {
 	if found && v != "" {
 		node.dbPath = v
 	}
+	v, found = os.LookupEnv("INPUT_PATH")
+	if found && v != "" {
+		node.inputPath = v
+	}
+	v, found = os.LookupEnv("LOG_PATH")
+	if found && v != "" {
+		node.logPath = v
+	}
 	v, found = os.LookupEnv("CAPACITY")
 	if found && v != "" {
 		// If CAPACITY not integer, default capacity 3 is used
@@ -117,6 +127,14 @@ func (node *nodeConfig) EnvironmentConfig() error {
 		node.nodes, err = strconv.Atoi(v)
 		if err != nil {
 			node.nodes = 3
+		}
+	}
+	v, found = os.LookupEnv("DEFAULT_STAKE")
+	if found && v != "" {
+
+		node.defaultStake, err = strconv.ParseFloat(v,64)
+		if err != nil {
+			node.defaultStake = 1
 		}
 	}
 	return nil
@@ -158,15 +176,6 @@ func (node *nodeConfig) initialConfig() {
 		Addr: kafka.TCP(node.brokerURL),
 	}
 
-	if node.useCLI {
-		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: slog.LevelError,
-		}))
-	} else {
-		logger = slog.Default()
-	}
-	logger.With("nodeId", node.id)
 	logger.Info("Initial configuration done")
 }
 
-var logger *slog.Logger = slog.Default()

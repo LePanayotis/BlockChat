@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
-	"github.com/spf13/cobra"
+	"log/slog"
 	"net/rpc"
 	"os"
 	"strconv"
 	"strings"
+	"github.com/spf13/cobra"
 )
 
 // CLI command to create new transaction via RPC
@@ -224,12 +225,8 @@ var startCmd = &cobra.Command{
 	Long:  "Starts the node based on the configuration at the .env file",
 	Run: func(_cmd *cobra.Command, _args []string) {
 
-		
-
 		var node *nodeConfig = DefaultNodeConfig()
 		node.EnvironmentConfig()
-
-		fmt.Println(banner)
 
 		node.dbPath, _ = _cmd.Flags().GetString("database-path")
 		node.blockchainPath, _ = _cmd.Flags().GetString("blockchain-path")
@@ -244,22 +241,41 @@ var startCmd = &cobra.Command{
 
 		node.useCLI, _ = _cmd.Flags().GetBool("cli")
 
-		_cmd.Parent().RemoveCommand(_cmd)
-		//rootCmd.RemoveCommand(startCmd)
+		node.inputPath, _ = _cmd.Flags().GetString("input-path")
+		node.logPath, _ = _cmd.Flags().GetString("log-path")
 
+		if node.logPath != "" {
+			logfile, err := os.Create(node.logPath)
+			if err != nil {
+				return
+			}
+			writer := &TeeWriter{
+				stdout: os.Stderr,
+				file:   logfile,
+			}
+
+			logger = slog.New(slog.NewTextHandler(writer, &slog.HandlerOptions{
+				Level: slog.LevelInfo,
+			}))
+		}
+
+		_cmd.Parent().RemoveCommand(_cmd)
+		if node.useCLI {
+			fmt.Println(banner)
+		}
 		node.Start()
 	},
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "blockchat",
-	Short: "BlockChat is a simple CLI application",
-	Long:  `BlockChat is a simple CLI application built using Cobra.`,
+	Use:     "blockchat",
+	Short:   "BlockChat is a simple CLI application",
+	Long:    `BlockChat is a simple CLI application built using Cobra.`,
+	Version: "1.0.0",
 	Run: func(_cmd *cobra.Command, _args []string) {
 		fmt.Println(banner)
 	},
 }
-
 
 func ConfigCommands() *cobra.Command {
 
@@ -283,10 +299,20 @@ func ConfigCommands() *cobra.Command {
 	startCmd.Flags().StringP("database-path", "d", tempConfig.dbPath, "The path of the blockchain's json file")
 	startCmd.Flags().StringP("broker-url", "k", tempConfig.brokerURL, "The adress and port of the kafka broker")
 	startCmd.Flags().IntP("nodes", "N", tempConfig.nodes, "The number of nodes")
-	startCmd.Flags().BoolP("cli","i", tempConfig.useCLI, "If present, logs are silenced and interactive CLI activates")
+	startCmd.Flags().BoolP("cli", "i", tempConfig.useCLI, "If present, logs are silenced and interactive CLI activates")
+	startCmd.Flags().StringP("input-path", "f", tempConfig.inputPath, "Sets the input file of transactions")
+
+	startCmd.Flags().StringP("log-path", "l", tempConfig.logPath, "Redirects stderr to this file")
+
+	startCmd.MarkFlagFilename("log-path")
+	startCmd.MarkFlagFilename("input-path")
+	startCmd.MarkFlagFilename("blockchain-path")
+	startCmd.MarkFlagFilename("databases-path")
 
 	transactionCmd.Flags().StringP("message", "m", "", "If this flag exist, the transaction is a message")
 
+	rootCmd.Flags().Bool("license", false, "Prints the license")
+	rootCmd.SetVersionTemplate(fmt.Sprintf("BlockChat Version: %s", version))
 	for _, cmd := range commandSet {
 		cmd.Flags().StringP("protocol", "p", tempConfig.protocol, "The socket protocol: unix, tcp, udp")
 		cmd.Flags().StringP("socket", "s", tempConfig.socket, "The socket to connect to, use : before port number, example :1500")
@@ -326,7 +352,7 @@ func (node *nodeConfig) startCLI() error {
 		r.Comma = ' '
 		cmdArgs, err := r.Read()
 		if err != nil {
-			continue			
+			continue
 		}
 
 		rootCmd.SetArgs(cmdArgs[:])

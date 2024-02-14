@@ -67,13 +67,14 @@ func (node *nodeConfig) transactionListener() error {
 			logger.Error("Transaction listener exiting", "error",err)
 			return err
 		}
-
+		
+		node.logTransaction("Received new transaction",&tx)
 		// Verifies transaction and goes to next iteration
 		if !tx.Verify() {
 			logger.Warn("Transaction not verified")
 			continue
 		}
-		logger.Info("New transaction received")
+		
 
 		// Checks nodes database if transaction is possible
 		if node.isTransactionPossible(&tx) {
