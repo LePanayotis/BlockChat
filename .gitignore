@@ -18,10 +18,10 @@
 # vendor/
 
 # Go workspace file
+*.json
 go.work
 go.sum
 *.ps1
 .vscode/
 *.json
-env.copy
 input/
