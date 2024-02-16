@@ -301,7 +301,6 @@ func ConfigCommands() *cobra.Command {
 	startCmd.Flags().IntP("nodes", "N", tempConfig.nodes, "The number of nodes")
 	startCmd.Flags().BoolP("cli", "i", tempConfig.useCLI, "If present, logs are silenced and interactive CLI activates")
 	startCmd.Flags().StringP("input-path", "f", tempConfig.inputPath, "Sets the input file of transactions")
-
 	startCmd.Flags().StringP("log-path", "l", tempConfig.logPath, "Redirects stderr to this file")
 
 	startCmd.MarkFlagFilename("log-path")

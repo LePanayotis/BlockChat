@@ -3,16 +3,17 @@ package blockchat
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 )
 
 // A database in memory is a map int->WalletData for easy manipulation
-type DBmap map[int]WalletData
+type Database map[int]Wallet
 
 // Wallet data struct contains the information derived by a blockchain for a node's wallet
 // Each wallet has a Balance in BlockChat Coins (float64), the current nonce,
 // and a list of messages, represented by the Message struct below
-type WalletData struct {
+type Wallet struct {
 	Balance     float64   `json:"balance"`
 	CurentNonce uint      `json:"curent_nonce"`
 	Messages    []Message `json:"messages"`
@@ -27,14 +28,14 @@ type Message struct {
 }
 
 // Parses indicated file and returns a database
-func LoadDB(_path string) (DBmap, error) {
+func LoadDB(_path string) (Database, error) {
 	content, err := os.ReadFile(_path)
 	if err != nil {
 		return nil, err
 	}
 
 	// Makes initialy empty map and unmarshals json
-	db := make(DBmap)
+	db := make(Database)
 	if err := json.Unmarshal(content, &db); err != nil {
 		return nil, err
 	}
@@ -42,7 +43,7 @@ func LoadDB(_path string) (DBmap, error) {
 }
 
 // Writes json representation of database to indicated file
-func (db *DBmap) WriteDB(_path string) error {
+func (db *Database) WriteDB(_path string) error {
 	file, err := os.Create(_path)
 	if err != nil {
 		return err
@@ -58,36 +59,19 @@ func (db *DBmap) WriteDB(_path string) error {
 	return nil
 }
 
-// Parses json file and sets node database to the one created from the file
-func (node *nodeConfig) LoadDB() (DBmap, error) {
-	var err error
-	node.myDB, err = LoadDB(node.dbPath)
-	return node.myDB, err
-}
-
-// Writes node's database to the file specified in node configuration
-func (node *nodeConfig) WriteDB() error {
-	return node.myDB.WriteDB(node.dbPath)
-}
-
-// Checks if an id has already an entry in the database
-func (db *DBmap) accountExists(_accountId int) bool {
-	return db.accountExistsAdd(_accountId, false)
-}
-
 // Checks if an id has already an entry in the database and adds it in the database
 // according to _addIfNotExists
-func (db *DBmap) accountExistsAdd(_accountId int, _addIfNotExists bool) bool {
+func (db *Database) accountExistsAdd(_accountId int) bool {
 	// Checks if account exists and its id does not equal -1 (->"0" wallet)
-	_, exists := (*db)[_accountId]
+	_, exists := db.getWalletExists(_accountId)
 	if !exists && _accountId != -1 {
-		// Creates account if it doesn't exist according to _addIfNotExists
-		if _addIfNotExists {
-			(*db)[_accountId] = WalletData{
-				Balance:  0,
-				Messages: []Message{},
-			}
-		}
+		// Creates account if it doesn't exist
+
+		db.setWallet(_accountId, Wallet{
+			Balance:  0,
+			Messages: []Message{},
+		})
+
 		// Account does not exist
 		return false
 	}
@@ -98,76 +82,66 @@ func (db *DBmap) accountExistsAdd(_accountId int, _addIfNotExists bool) bool {
 // According to the pointed database data, checks if a transaction can be performed
 // Meaning checks if the sender account has enough balance to send the transaction
 // and its fees
-func (db *DBmap) isTransactionPossible(_tx *Transaction, _accountId int) bool {
-	// If sender is "0" wallet there's no need to check...they are definitely rich
-	if _tx.SenderAddress == "0" {
-		return true
-	}
+func (db *Database) isTransactionPossibleSetNonce(_tx *Transaction, _accountId int) error {
 	// Amount + Fee <= Balance
-	return _tx.CalcFee()+_tx.Amount <= (*db)[_accountId].Balance
+
+	wallet, exists := db.getWalletExists(_accountId)
+	if _accountId == -1 {
+		return nil
+	}
+
+	if !exists {
+		return fmt.Errorf("exists no account for node %v, transaction not possible", _accountId)
+	}
+
+	withdraw := _tx.CalcFee() + _tx.Amount
+	nonceInv, balanceIns := _tx.Nonce <= wallet.CurentNonce, withdraw > wallet.Balance
+	var err error = nil
+	if nonceInv {
+		err = fmt.Errorf("transaction nonce expected greater than %v, got %v for node %v", wallet.CurentNonce, _tx.Nonce, _accountId)
+	}
+
+	//DANGEROUS POINT
+	db.setNonce(_accountId, _tx.Nonce)
+	if balanceIns {
+		err = errors.Join(err, fmt.Errorf("insufficient balance: %v, requested amount: %v from node: %v", wallet.Balance, withdraw, _accountId))
+	}
+	return err
 }
 
 // Changes an account's balance
-func (db *DBmap) changeBalance(_accountId int, _amount float64) error {
-	// If account is not "0" wallet (represented as -1)
-	if _accountId != -1 {
-
-		var newWallet WalletData = (*db)[_accountId]
-		// Is balance sufficient?
-		if newWallet.Balance+_amount < 0 {
-			return errors.New("insufficient balance")
-		}
-		// Update wallet balance and database
-		newWallet.Balance += _amount
-		(*db)[_accountId] = newWallet
+func (db *Database) addToBalance(_accountId int, _amount float64) {
+	if _accountId == -1 {
+		return
 	}
-	return nil
+	wallet := db.getWallet(_accountId)
+	// Update wallet balance and database
+	wallet.Balance += _amount
+	db.setWallet(_accountId, wallet)
+
 }
 
 // Adds message transaction to database
 // changeBalance needs to be performed before this
-func (db *DBmap) addMessage(_accountId int, _m Message) {
+func (db *Database) addMessage(_accountId int, _m Message) {
 	// Gets wallet from database
-	newWallet := (*db)[_accountId]
+	newWallet := db.getWallet(_accountId)
 	// Appends message to wallet
 	newWallet.Messages = append(newWallet.Messages, _m)
 	// Updates database entry
-	(*db)[_accountId] = newWallet
+	db.setWallet(_accountId, newWallet)
 }
 
 // Adds transaction to database, provided translated sender and receiver ids
-func (db *DBmap) addTransaction(_tx *Transaction, _senderId int, _receiverId int) (float64, error) {
+// just the transaction is added, NO CHECK IS DONE
+func (db *Database) addTransaction(_tx *Transaction, _senderId int, _receiverId int) float64 {
 
-	// Adds accounts if they don't already exist
-	db.accountExistsAdd(_senderId, true)
-	db.accountExistsAdd(_receiverId, true)
-
-	// If sender is not "0" wallet
-	if _senderId != -1 {
-		//Check if the nonce of the transaction is the expected one as in the database
-		if _tx.Nonce > (*db)[_senderId].CurentNonce {
-			// If nonce okey, increases the nonce in database
-			db.increaseNonce(_senderId)
-		} else {
-			// Nonce inconsistent
-			return 0, errors.New("Transaction nonce invalid")
-		}
-	}
 	// Gets the fee
 	fee := _tx.CalcFee()
 
 	// Removes from sender's wallet the amount and the fee
-	err := db.changeBalance(_senderId, 0-_tx.Amount-fee)
-	if err != nil {
-		return 0, err
-	}
 
-	// Credits the amount to the receiver wallet
-	err = db.changeBalance(_receiverId, _tx.Amount)
-	if err != nil {
-		return 0, err
-	}
-
+	db.addToBalance(_senderId, 0-_tx.Amount-fee)
 	// Appends the message
 	if _tx.Type == "message" {
 		db.addMessage(_receiverId, Message{
@@ -175,126 +149,124 @@ func (db *DBmap) addTransaction(_tx *Transaction, _senderId int, _receiverId int
 			Nonce:   _tx.Nonce,
 			Content: _tx.Message,
 		})
+	} else {
+		// Credits the amount to the receiver wallet
+		db.addToBalance(_receiverId, _tx.Amount)
 	}
-	// returns the transaction fee
-	return fee, nil
-
+	return fee
 }
 
 // Returns account's balance according to database
-func (db *DBmap) getBalance(_accountId int) float64 {
+func (db *Database) getBalance(_accountId int) float64 {
 	return (*db)[_accountId].Balance
 }
 
-// Increases an account's nonce by 1
-func (db *DBmap) increaseNonce(_accountId int) uint {
-	// If account exists
-	if temp, b := (*db)[_accountId]; b {
-		temp.CurentNonce++
-		(*db)[_accountId] = temp
-	}
-	// Return increased nonce
-	return (*db)[_accountId].CurentNonce
+func (db *Database) setWallet(_accountId int, wallet Wallet) {
+	(*db)[_accountId] = wallet
 }
 
-// Increases nonce of current node's account
-func (node *nodeConfig) increaseNonce() uint {
-	return node.myDB.increaseNonce(node.id)
+func (db *Database) getWalletExists(_accountId int) (Wallet, bool) {
+	wallet, exists := (*db)[_accountId]
+	return wallet, exists
+}
+
+func (db *Database) getWallet(_accountId int) Wallet {
+	return (*db)[_accountId]
+}
+
+func (db *Database) setNonce(_accountId int, _nonce uint) {
+	// If account exists
+	if wallet, b := db.getWalletExists(_accountId); b {
+		wallet.CurentNonce = _nonce
+		db.setWallet(_accountId, wallet)
+
+	}
 }
 
 // Gets nonce of account requested
-func (db *DBmap) getNonce(_accountId int) uint {
+func (db *Database) getNonce(_accountId int) uint {
 	return (*db)[_accountId].CurentNonce
 }
 
 // Checks the node's database if a transaction is possible
-func (node *nodeConfig) isTransactionPossible(_tx *Transaction) bool {
+func (node *nodeConfig) isTransactionPossibleSetNonce(_tx *Transaction) error {
 	// Maps key to node id
-	accoundId := node.nodeMap[_tx.SenderAddress]
+	accoundId := node.nodeMap[_tx.Sender]
 	// Checks
-	return node.myDB.isTransactionPossible(_tx, accoundId)
+	return node.myDB.isTransactionPossibleSetNonce(_tx, accoundId)
 }
 
 // Adds transaction to node's database
-func (node *nodeConfig) addTransactionToDB(_tx *Transaction) (float64, error) {
+func (node *nodeConfig) addTransactionToDB(_tx *Transaction) {
 
-	var senderId, receiverId int
-	// Maps wallets to node ids
-	// If sender/receiver wallet is "0", it's mapped to -1
-	if _tx.SenderAddress == "0" {
-		senderId = -1
-	} else {
-		senderId = node.nodeMap[_tx.SenderAddress]
-	}
-	if _tx.ReceiverAddress == "0" {
-		receiverId = -1
-	} else {
-		receiverId = node.nodeMap[_tx.ReceiverAddress]
-	}
+	senderId, receiverId := addressToId(&node.nodeMap, _tx.Sender), addressToId(&node.nodeMap, _tx.Receiver)
 	// Adds transaction
-	return node.myDB.addTransaction(_tx, senderId, receiverId)
+	node.myDB.addTransaction(_tx, senderId, receiverId)
+}
+
+func addressToId(addressMap *map[string]int, _address string) int {
+	if _address == "0" {
+		return -1
+	}
+	return (*addressMap)[_address]
+}
+
+func (db *Database) addBlock(_block *Block, _adressMap *map[string]int) {
+	fee := float64(0)
+	// For each transaction in the block
+	for _, tx := range _block.Transactions {
+		senderId := addressToId(_adressMap, tx.Sender)
+		receiverId := addressToId(_adressMap, tx.Receiver)
+
+		// Adds accounts if they don't already exist
+		db.accountExistsAdd(senderId)
+		db.accountExistsAdd(receiverId)
+		if senderId != -1 {
+			err := db.isTransactionPossibleSetNonce(&tx, senderId)
+			if err != nil {
+				logger.Error("Could not add transaction from block", "error", err)
+			}
+		}
+		fee = +db.addTransaction(&tx, senderId, receiverId)
+
+	}
+	// Credit the validator, the fees
+	db.addToBalance(_block.Validator, fee)
+
+	// Credit the stakes back to their senders
+	for _, tx := range _block.Transactions {
+		if tx.Receiver == "0" {
+			// Map wallet to node id
+			senderId := addressToId(_adressMap, tx.Sender)
+			// Change sender's balance with stake amount
+			db.addToBalance(senderId, tx.Amount)
+		}
+	}
 }
 
 // Adds block, and consequently all of its transactions to node's database
 // Validity of the block and its transactions is not implemented in this stage
 // TODO
-func (node *nodeConfig) addBlockToDB(_block *Block) error {
-	fee := float64(0)
-	// For each transaction in the block
-	for _, tx := range _block.Transactions {
-		if !node.isTransactionPossible(&tx) {
-			return errors.New("transaction from block not possible to add to database")
-		}
-		// TODO: i removed something from here earlier
-		tmp, err := node.addTransactionToDB(&tx)
-		if err != nil {
-			return errors.Join(errors.New("failed to add block transaction to database"), err)
-		}
-		fee += tmp
-	}
-	// Credit the validator, the fees
-	err := node.myDB.changeBalance(_block.Validator, fee)
-	if err != nil {
-		return errors.Join(errors.New("failed to credit fees to validator"), err)
-	}
-	// Credit the stakes back to their senders
-	for _, tx := range _block.Transactions {
-		if tx.ReceiverAddress == "0" {
-			// Map wallet to node id
-			senderId := node.nodeMap[tx.ReceiverAddress]
-			// Change sender's balance with stake amount
-			err := node.myDB.changeBalance(senderId, tx.Amount)
-			if err != nil {
-				return errors.Join(errors.New("failed to return stake from block transaction"), err)
-			}
-		}
-	}
-
-	return nil
+func (node *nodeConfig) addBlockToDB(_block *Block) {
+	node.myDB.addBlock(_block, &node.nodeMap)
 }
 
 // When a new block is received by the validator block, if it's hash is the same as the one
 // recorded in the current node, then the database has already all the changes
 // All that is left to do is to credit back the stakes back to their senders and the total fees to the validator
-func (node *nodeConfig) addBlockUndoStake(_block *Block) error {
+func (db *Database) addBlockUndoStake(_block *Block, _addressMap *map[string]int) {
 
 	fee := float64(0)
 	// Parses all transactions
 	for _, tx := range _block.Transactions {
 		// If transaction is a stake
-		if tx.ReceiverAddress == "0" {
+		if tx.Receiver == "0" {
 			//Undos stakes
 			// Maps wallet address to node id
-			senderId := node.nodeMap[tx.SenderAddress]
-			if tx.SenderAddress == "0" {
-				senderId = -1
-			}
+			senderId := addressToId(_addressMap, tx.Sender)
 
 			// Refunds amount
-			err := node.myDB.changeBalance(senderId, tx.Amount)
-			if err != nil {
-				return errors.Join(errors.New("failed to refund stake"), err)
-			}
+			db.addToBalance(senderId, tx.Amount)
 			// Stakes have no fees
 			continue
 		}
@@ -302,29 +274,38 @@ func (node *nodeConfig) addBlockUndoStake(_block *Block) error {
 		fee += tx.CalcFee()
 	}
 	// Sum of block fees is credited to the validator
-	err := node.myDB.changeBalance(_block.Validator, fee)
-	if err == nil {
-		return nil
-	}
-	return errors.Join(errors.New("failed to credit fees to validator"), err)
+	db.addToBalance(_block.Validator, fee)
+}
+
+func (node *nodeConfig) addBlockUndoStake(_block *Block) {
+	node.myDB.addBlockUndoStake(_block, &node.nodeMap)
 }
 
 // Sets the node database as instructed by its blockchain
 func (node *nodeConfig) MakeDB() error {
 	// Checks if node's blockchain is valid
-	_, IsValid := node.IsBlockchainValid()
+	IsValid := node.IsBlockchainValid()
 	// Return error if not valid
 	if !IsValid {
 		return errors.New("node's blockchain is not valid")
 	}
 	//  Create empty database
-	node.myDB = make(DBmap)
+	node.myDB = make(Database)
 	for _, block := range node.blockchain {
 		// Adds block to database
-		err := node.addBlockToDB(&block)
-		if err != nil {
-			return errors.Join(errors.New("failed to add block to database"), err)
-		}
+		node.addBlockToDB(&block)
 	}
 	return nil
+}
+
+// Parses json file and sets node database to the one created from the file
+func (node *nodeConfig) LoadDB() (Database, error) {
+	var err error
+	node.myDB, err = LoadDB(node.dbPath)
+	return node.myDB, err
+}
+
+// Writes node's database to the file specified in node configuration
+func (node *nodeConfig) WriteDB() error {
+	return node.myDB.WriteDB(node.dbPath)
 }

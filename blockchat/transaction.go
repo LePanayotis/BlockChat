@@ -14,7 +14,7 @@ import (
 )
 
 // The basic struct representing the transactions in BlockChat
-// `SenderAddress` and `ReiceiverAddress` are the public keys of
+// `Sender` and `ReiceiverAddress` are the public keys of
 // the sender and the receiver of the transaction respectively,
 // whether it is a simple message or a transfer transaction.
 // The `Type` can have the values: "message" or "transfer"
@@ -24,14 +24,14 @@ import (
 // as defined in GetConcat method.
 // `Signature` is the encrypted `Id` with the private key of the sender
 type Transaction struct {
-	SenderAddress      string  `json:"sender_address"`
-	ReceiverAddress    string  `json:"receiver_address"`
-	Type string  `json:"type_of_transaction"`
-	Amount              float64 `json:"amount"`
-	Message             string  `json:"message"`
-	Nonce               uint    `json:"nonce"`
-	Id      string  `json:"transaction_id"`
-	Signature           string  `json:"Signature"`
+	Sender    string  `json:"s"`
+	Receiver  string  `json:"r"`
+	Type      string  `json:"t"`
+	Amount    float64 `json:"a"`
+	Message   string  `json:"m"`
+	Nonce     uint    `json:"n"`
+	Id        string  `json:"i"`
+	Signature string  `json:"sg"`
 }
 
 // Creates a new message transaction instance
@@ -69,15 +69,14 @@ func (t *Transaction) JSONify() (string, error) {
 
 }
 
-
 // Checks if transaction `t` is valid. This means:
-// `t`'s `SenderAddress` and `ReceiverAddress` are not empty strings
+// `t`'s `Sender` and `Receiver` are not empty strings
 // `Amount` is not negative
 // `Type` is either "trasfer" or "message"
 func (t *Transaction) IsValid() bool {
 	// Checks addresses not empty and amount non negative
-	if t.SenderAddress == "" ||
-		t.ReceiverAddress == "" ||
+	if t.Sender == "" ||
+		t.Receiver == "" ||
 		t.Amount < 0 {
 		return false
 	}
@@ -86,16 +85,15 @@ func (t *Transaction) IsValid() bool {
 	if t.Type == "transfer" &&
 		t.Amount > 0 &&
 		t.Message == "" {
-			return true
+		return true
 	} else if t.Type == "message" &&
 		// Messages have non-empty message content and zero amount, and can't be sent or received by "0" wallet
 		t.Message != "" &&
-		t.Amount == 0 && (t.ReceiverAddress != "0" && t.SenderAddress != "0") {
-			return true
+		t.Amount == 0 && (t.Receiver != "0" && t.Sender != "0") {
+		return true
 	}
 	return false
 }
-
 
 // Returns a Transaction instance from a json string
 // Error if parsing fails
@@ -115,13 +113,13 @@ func newTransactionInstance(_senderAddress string, _receiverAddress string,
 
 	var t Transaction
 	// Sets instance's fields
-	t.SenderAddress = _senderAddress
-	t.ReceiverAddress = _receiverAddress
+	t.Sender = _senderAddress
+	t.Receiver = _receiverAddress
 	t.Type = _Type
 	t.Amount = _amount
 	t.Nonce = _nonce
 	t.Message = _message
-	
+
 	// Signs transaction
 	_, err := t.Sign(_privateKey)
 	if err != nil {
@@ -130,14 +128,13 @@ func newTransactionInstance(_senderAddress string, _receiverAddress string,
 	return t
 }
 
-
 // Returns a concatenation of basic properties of the transactions
 func (t *Transaction) GetConcat() string {
-	concat := t.SenderAddress + t.ReceiverAddress + t.Type + strconv.FormatFloat(t.Amount, 'f', -1, 64) + strconv.Itoa(int(t.Nonce)) + t.Message
+	concat := t.Sender + t.Receiver + t.Type + strconv.FormatFloat(t.Amount, 'f', -1, 64) + strconv.Itoa(int(t.Nonce)) + t.Message
 	return concat
 }
 
-//Returns hash of the string concatenation of a transaction
+// Returns hash of the string concatenation of a transaction
 func (t *Transaction) GetHash() ([32]byte, error) {
 	concat := []byte(t.GetConcat())
 	hash := sha256.Sum256(concat)
@@ -145,15 +142,13 @@ func (t *Transaction) GetHash() ([32]byte, error) {
 	return hash, nil
 }
 
-
-//Sets the `Id`
+// Sets the `Id`
 func (t *Transaction) SetHash(_hash [32]byte) (string, error) {
 	t.Id = hex.EncodeToString(_hash[:])
 	return t.Id, nil
 }
 
-
-//Signs the transaction with the given private key
+// Signs the transaction with the given private key
 func (t *Transaction) Sign(_privateKey string) (string, error) {
 	// Get's transaction's hash
 	transactionHash, err := t.GetHash()
@@ -193,12 +188,12 @@ func (t *Transaction) Sign(_privateKey string) (string, error) {
 
 }
 
-//Verifies transaction:
-//Checks if transaction properties values conform to the constraints
-//Then verifies signature with the sender's public key
-func (t *Transaction) Verify() (bool) {
+// Verifies transaction:
+// Checks if transaction properties values conform to the constraints
+// Then verifies signature with the sender's public key
+func (t *Transaction) Verify() bool {
 	// A Verified transaction must be valid (obey the constraints)
-	if (!t.IsValid()){
+	if !t.IsValid() {
 		return false
 	}
 	// Calculates hash
@@ -213,11 +208,11 @@ func (t *Transaction) Verify() (bool) {
 	}
 
 	var publicKeyString string
-	if t.SenderAddress == "0" {
+	if t.Sender == "0" {
 		//If sender is genesis block, then t is signed with bootstrap node keys
-		publicKeyString = t.ReceiverAddress
+		publicKeyString = t.Receiver
 	} else {
-		publicKeyString = t.SenderAddress
+		publicKeyString = t.Sender
 	}
 
 	publicKeyArray, err := hex.DecodeString(publicKeyString)
@@ -236,57 +231,56 @@ func (t *Transaction) Verify() (bool) {
 	return err == nil
 }
 
-//Calculates the fee based on the type of the transaction
+// Calculates the fee based on the type of the transaction
 func (t *Transaction) CalcFee() float64 {
-	if t.SenderAddress == "0" || t.ReceiverAddress == "0" {
+	if t.Sender == "0" || t.Receiver == "0" {
 		return 0
-	} else if (t.Type =="transfer") {
-		return t.Amount*feePercentage
-	} else if (t.Type =="message"){
-		return float64(len(t.Message)*costPerChar)
+	} else if t.Type == "transfer" {
+		return t.Amount * feePercentage
+	} else if t.Type == "message" {
+		return float64(len(t.Message) * costPerChar)
 	}
 	return 0
 }
 
-
 // Creates message transaction with node's configuration
-func (node *nodeConfig) NewMessageTransaction(_receiverAddress string, _message string) Transaction{
+func (node *nodeConfig) NewMessageTransaction(_receiverAddress string, _message string) Transaction {
 	node.outboundNonce++
 	return newTransactionInstance(node.publicKey, _receiverAddress, "message", 0, _message, node.outboundNonce, node.privateKey)
 }
 
 // Creates transfer transaction with node's configuration
-func (node *nodeConfig) NewTransferTransaction(_receiverAddress string, _amount float64) Transaction{
+func (node *nodeConfig) NewTransferTransaction(_receiverAddress string, _amount float64) Transaction {
 	node.outboundNonce++
 	return newTransactionInstance(node.publicKey, _receiverAddress, "transfer", _amount, "", node.outboundNonce, node.privateKey)
 }
 
 func (node *nodeConfig) logTransaction(_logInfo string, _tx *Transaction) {
 
-	nonce, amount, message, id := _tx.Nonce, _tx.Amount, _tx.Message ,_tx.Id
+	nonce, amount, message, id := _tx.Nonce, _tx.Amount, _tx.Message, _tx.Id
 	var sender, receiver string
 
 	fmt.Print()
-	senderId, b := node.nodeMap[_tx.SenderAddress]
-	if !b && _tx.SenderAddress != "0" {
-		logger.Error("Requested to log transaction with unresoluted sender wallet address owner node","sender",_tx.SenderAddress)
+	senderId, b := node.nodeMap[_tx.Sender]
+	if !b && _tx.Sender != "0" {
+		logger.Error("Requested to log transaction with unresoluted sender wallet address owner node", "sender", _tx.Sender)
 		return
-	} 
+	}
 	sender = strconv.Itoa(senderId)
-	receiverId, b := node.nodeMap[_tx.ReceiverAddress]
-	if !b && _tx.ReceiverAddress != "0" {
-		logger.Error("Requested to log transaction with unresoluted receiver node wallet addres","receiver",_tx.ReceiverAddress)
+	receiverId, b := node.nodeMap[_tx.Receiver]
+	if !b && _tx.Receiver != "0" {
+		logger.Error("Requested to log transaction with unresoluted receiver node wallet addres", "receiver", _tx.Receiver)
 		return
 	}
 	receiver = strconv.Itoa(receiverId)
-	if _tx.SenderAddress == "0" {
-		logger.Info("Genesis transaction","to",receiver,"amount",amount,"nonce",nonce, "tid",id)
+	if _tx.Sender == "0" {
+		logger.Info("Genesis transaction", "to", receiver, "amount", amount, "nonce", nonce, "tid", id)
 		return
 	}
-	if _tx.ReceiverAddress == "0" {
-		logger.Info(_logInfo, "type","stake","from", sender,"amount",amount, "nonce",nonce,"tid",id)
+	if _tx.Receiver == "0" {
+		logger.Info(_logInfo, "type", "stake", "from", sender, "amount", amount, "nonce", nonce, "tid", id)
 		return
 	}
-	logger.Info(_logInfo,"type",_tx.Type,"from",sender,"to",receiver,"amount",amount,"message",message,"nonce",nonce, "tid",id)
+	logger.Info(_logInfo, "type", _tx.Type, "from", sender, "to", receiver, "amount", amount, "message", message, "nonce", nonce, "tid", id)
 
 }

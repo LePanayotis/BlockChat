@@ -13,17 +13,17 @@ import (
 // Basic struct that represents the blocks of the Blockchain
 type Block struct {
 	//The increasing index of the block in the blockchain
-	Index int `json:"index"`
+	Index int `json:"i"`
 	//Creation publication timestamp
-	Timestamp string `json:"timestamp"`
+	Timestamp string `json:"t"`
 	//Array with transactions in the blockchain
-	Transactions []Transaction `json:"transactions"`
+	Transactions []Transaction `json:"tx"`
 	//The public key of the block validator
-	Validator int `json:"validator"`
+	Validator int `json:"v"`
 	//Hash produced from the result of GetConcat method
-	CurrentHash string `json:"current_hash"`
+	CurrentHash string `json:"h"`
 	//The hash of the previous block in the blockchain
-	PreviousHash string `json:"previous_hash"`
+	PreviousHash string `json:"p"`
 }
 
 // Returns concatenation of key properties of the block
@@ -37,64 +37,11 @@ func (b *Block) GetConcat() string {
 }
 
 // Returns hash256 of the above concatenation
-func (b *Block) GetHash() ([32]byte) {
+func (b *Block) GetHash() [32]byte {
 	concat := []byte(b.GetConcat())
 	hash := sha256.Sum256(concat)
 	return hash
 }
-
-// Creates the instance of the Genesis Block,
-// the first block of the blockchain with only one transaction
-// to the bootstrap node.
-func (node *nodeConfig) GenesisBlock() Block {
-	//Timestamp in UTC in the format indicated in the timeFormat
-	timestamp := time.Now().UTC().Format(timeFormat)
-
-	//The only transaction of the block granting initialBCC*(#number of nodes)
-	t := NewTransferTransaction("0", node.publicKey, initialBCC*float64(node.nodes), 0, node.privateKey)
-
-	transactions := []Transaction{
-		t,
-	}
-
-	// Block instance containing only t transaction
-	b := Block{
-		Index:         0,
-		Timestamp:     timestamp,
-		Transactions:  transactions,
-		Validator:     0,
-		PreviousHash: "1",
-	}
-
-	// Sets the hash
-	hashBytes := b.GetHash()
-	b.CurrentHash = hex.EncodeToString(hashBytes[:])
-	// Returns genesis block
-	return b
-}
-
-// Creates new block with input parameters its index and the hash of the previous block
-func (node *nodeConfig) NewBlock() Block {
-
-	// Checks node's blockchain length
-	// In case of 0, returns empty default block
-	length := len(node.blockchain)
-	if length == 0 {
-		return *new(Block)
-	}
-	// Creates new block instance
-	// Its index is the length of the blockchain
-	// Previoush hash is the hash of the previous block
-	b := Block{
-		Index:         length,
-		Transactions:  nil,
-		Validator:     -1,
-		PreviousHash: node.blockchain[length-1].CurrentHash,
-	}
-	return b
-}
-
-
 
 // Calculates and sets the hash of the block
 func (b *Block) CalcHash() {
@@ -103,7 +50,7 @@ func (b *Block) CalcHash() {
 }
 
 // Appends transaction to the transaction list
-func (b *Block) AddTransaction(_tx *Transaction) int{
+func (b *Block) AppendTransaction(_tx *Transaction) int {
 	b.Transactions = append(b.Transactions, *_tx)
 	return len(b.Transactions)
 }
@@ -128,50 +75,37 @@ func ParseBlockJSON(s string) (Block, error) {
 
 }
 
-// Checks whether is valid or not, provided the hash of the previous block
-func (node *nodeConfig) IsBlockValid(_b *Block, _previousHash string) bool {
-	// Block index and validator must be greater than zero
-	if _b.Index < 0 || _b.Validator < 0 {
-		return false
-	}
-
+func (b *Block) IsValid(_previousHash string, _adressMap *map[string]int) bool {
 	// Auxiliary boolean variable
 	temp := true
 	// Check all transactions are verified
-	for _, value := range _b.Transactions {
+	for _, value := range b.Transactions {
 		temp = temp && value.Verify()
 		if !temp {
-			break
+			return false
 		}
 	}
-	
-	// No need to check hash and validator if contains non verified transactions
-	if temp {
-		// Gets end encodes hash to string
-		currenHashBytes:= _b.GetHash()
-		currentHash := hex.EncodeToString(currenHashBytes[:])
-		
-		// Checks hash matches contained hash in block
-		temp = currentHash == _b.CurrentHash
-		// Checks validator is expected
-		temp = temp && node.CalcValidator(_b) == _b.Validator
-		// Checks previous hash matches parameter
-		temp = temp && _b.PreviousHash == _previousHash
+	// Checks previous hash matches parameter
+	if _previousHash != b.PreviousHash {
+		return false
 	}
-	// If all validity criteria are met returns true
-	return temp
+	// Gets end encodes hash to string
+	currenHashBytes := b.GetHash()
+	currentHash := hex.EncodeToString(currenHashBytes[:])
+	// Checks hash matches contained hash in block
+	if currentHash != b.CurrentHash {
+		return false
+	}
+	// Checks validator is expected
+	return b.CalcValidator(_adressMap) == b.Validator
+
 }
 
-// First calculates then sets the validator of the block
-func (node *nodeConfig) SetValidator(b *Block) {
-	b.Validator = node.CalcValidator(b)
-}
+func (b* Block) CalcValidator(_adressMap *map[string]int) int {
 
-// Calculates the validator of the current block based on the stakes
-// A stake is a transfer to the "0" wallet
-func (node *nodeConfig) CalcValidator(b *Block) int {
-	// Array to store each node's stakes
-	var nodeStakes []float64 = make([]float64, node.nodes)
+	nodes := len(*_adressMap)
+
+	var nodeStakes []float64 = make([]float64, nodes)
 	var stakes int = 0
 	// Initialise array entries to 0
 	for i := range nodeStakes {
@@ -181,11 +115,11 @@ func (node *nodeConfig) CalcValidator(b *Block) int {
 	// Parse block's transactions
 	for _, v := range b.Transactions {
 		// If transaction is a stake (receiver wallet "0")
-		if v.ReceiverAddress == "0" {
+		if v.Receiver == "0" {
 			// Increases stakes number
 			stakes++
 			// Maps sender address to node id
-			receiverNode := node.nodeMap[v.SenderAddress]
+			receiverNode := (*_adressMap)[v.Sender]
 			// Increases stake amount of the node
 			nodeStakes[receiverNode] += v.Amount
 		}
@@ -203,31 +137,83 @@ func (node *nodeConfig) CalcValidator(b *Block) int {
 
 	// Create RNG with the block's previous hash as seed
 	randomGenerator := rand.New(rand.NewSource(stringToSeed(b.PreviousHash)))
-	
+
 	// Gets the lucky coin
 	lucky := randomGenerator.Float64() * steaksSum
-	
+
 	// Finds which node has the lucky coin
 	temp := 0.
-	for i := 0; i < node.nodes; i++ {
+	for i := 0; i < nodes; i++ {
 		nodeStakes[i] += temp
 		temp = nodeStakes[i]
 		if lucky < temp {
 			return i
 		}
 	}
-
 	// If nothing goes right, validator is node 0
 	return 0
+}
 
+func (b *Block) SetValidator(_adressMap *map[string]int) int{
+	b.Validator = b.CalcValidator(_adressMap)
+	return b.Validator
 }
 
 // Converts a block's hash into a seed for an RNG algorithm used in CalcValidator()
 func stringToSeed(_s string) int64 {
 	hash := fnv.New64a()
-	_ , err :=  hash.Write([]byte(_s))
+	_, err := hash.Write([]byte(_s))
 	if err != nil {
 		return int64(0)
 	}
 	return int64(hash.Sum64())
+}
+
+// Creates the instance of the Genesis Block,
+// the first block of the blockchain with only one transaction
+// to the bootstrap node.
+func GenesisBlock(_publicKey string, _privateKey string, _nodes int) Block {
+	timestamp := time.Now().UTC().Format(timeFormat)
+
+	//The only transaction of the block granting initialBCC*(#number of nodes)
+	t := NewTransferTransaction("0", _publicKey, initialBCC*float64(_nodes), 0, _privateKey)
+
+	transactions := []Transaction{
+		t,
+	}
+
+	// Block instance containing only t transaction
+	b := Block{
+		Index:        0,
+		Timestamp:    timestamp,
+		Transactions: transactions,
+		Validator:    0,
+		PreviousHash: "1",
+	}
+
+	// Sets the hash
+	hashBytes := b.GetHash()
+	b.CurrentHash = hex.EncodeToString(hashBytes[:])
+	// Returns genesis block
+	return b
+}
+
+// Creates new block with input parameters its index and the hash of the previous block
+func (node *nodeConfig) NewBlock() Block {
+	// Checks node's blockchain length
+	// In case of 0, returns empty default block
+	length := len(node.blockchain)
+	if length == 0 {
+		return *new(Block)
+	}
+	// Creates new block instance
+	// Its index is the length of the blockchain
+	// Previoush hash is the hash of the previous block
+	b := Block{
+		Index:        length,
+		Transactions: []Transaction{},
+		Validator:    -1,
+		PreviousHash: node.blockchain[length-1].CurrentHash,
+	}
+	return b
 }

@@ -4,7 +4,6 @@ import (
 	"os"
 	"strconv"
 	"time"
-
 	"github.com/segmentio/kafka-go"
 )
 
@@ -42,10 +41,9 @@ type nodeConfig struct {
 	// The following fields are subject to change by the code
 	currentBlock Block      // Current block being processed by node instance
 	blockchain   Blockchain // An arrary of blocks
-	myDB         DBmap      // Includes in memory wallet data as generated from blockchain
+	myDB         Database      // Includes in memory wallet data as generated from blockchain
 
 	outboundNonce uint   // Temporary nonce of node
-	lastHash      string // Hash of block before current block in blockchain
 
 	useCLI bool // *************************
 	// Pointers to kafka producer and consumers
@@ -66,7 +64,6 @@ func DefaultNodeConfig() *nodeConfig {
 		protocol:       "tcp",
 		brokerURL:      "localhost:9094",
 		id:             0,
-		lastHash:       genesisHash,
 		idString:       "0",
 		outboundNonce:  0,
 		useCLI:         false,
@@ -154,8 +151,6 @@ func (node *nodeConfig) initialConfig() {
 
 	// Sets start time
 	node.startTime = time.Now().UTC().Format(timeFormat)
-	// Initial last hash is genesis hash
-	node.lastHash = genesisHash
 
 	node.idString = strconv.Itoa(node.id)
 

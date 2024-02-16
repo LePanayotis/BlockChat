@@ -2,7 +2,6 @@ package blockchat
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 )
 
@@ -34,7 +33,7 @@ func (node *nodeConfig) WriteBlockchain() error {
 	return node.blockchain.WriteBlockchain(node.blockchainPath)
 }
 
-func (node *nodeConfig) IsBlockchainValid() (int, bool) {
+func (node *nodeConfig) IsBlockchainValid() bool {
 	previousHash := genesisHash	
 	boolState := true
 	i := 0
@@ -42,7 +41,7 @@ func (node *nodeConfig) IsBlockchainValid() (int, bool) {
 	// Checks each block in the blockchain
 	for _, block := range node.blockchain {
 		// Checks if block is valid and has the expected index
-		boolState = boolState && node.IsBlockValid(&block, previousHash) && block.Index == i
+		boolState = boolState && block.IsValid(previousHash, &node.nodeMap) && block.Index == i
 		// New previous hash
 		previousHash = block.CurrentHash
 
@@ -56,23 +55,5 @@ func (node *nodeConfig) IsBlockchainValid() (int, bool) {
 		}
 	}
 	// Returns validity and last valid block in blockchain
-	return i, boolState
-}
-
-// Appends valid block to blockchain
-func (node *nodeConfig) addBlock(_block *Block) error {
-
-	B := &node.blockchain
-
-	// If blockchain empty and block index equals 0, append block. Check its own previous hash
-	if len(*B) == 0 && _block.Index == 0 && node.IsBlockValid(_block, _block.PreviousHash) {
-		*B = append(*B, *_block)
-		return nil
-
-	// If blockchain not empty and block index equals length of blockchain, append block
-	} else if node.IsBlockValid(_block, (*B)[len(*B)-1].CurrentHash) && _block.Index == len(*B) {
-		*B = append(*B, *_block)
-		return nil
-	}
-	return errors.New("Block not valid")
+	return boolState
 }

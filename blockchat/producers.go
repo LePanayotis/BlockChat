@@ -3,6 +3,8 @@ package blockchat
 import (
 	"context"
 	"encoding/json"
+	"time"
+
 	"github.com/segmentio/kafka-go"
 )
 
@@ -80,22 +82,18 @@ func (node *nodeConfig) broadcastWelcome() error {
 		// outbound nonce is increased in node.NewTransferTransaction
 		tx := node.NewTransferTransaction(receiver,initialBCC)
 		// Adds transaction to the curret block
-		block.AddTransaction(&tx)
+		block.AppendTransaction(&tx)
 		// Increases nonce in database
-		node.increaseNonce()
+	
 	}
 	
+	block.Timestamp = time.Now().UTC().Format(timeFormat)
 	// Calculates validator and hash
-	block.Validator = node.CalcValidator(&block)
+	block.SetValidator(&node.nodeMap)
 	block.CalcHash()
-
 	// Appends block to blockchain
-	err := node.addBlock(&block)
-	if err != nil {
-		logger.Error("Failed to add block to blockchain", "error",err)
-		return err
-	}
-
+	node.blockchain = append(node.blockchain, block)
+	
 	// Creates message struct to broadcast
 	// blockchain to the other nodes
 	msg := welcomeMessage{
