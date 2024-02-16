@@ -1,0 +1,12 @@
+time=2024-02-16T15:53:49.865+02:00 level=INFO msg="Initial configuration done"
+time=2024-02-16T15:53:49.884+02:00 level=INFO msg="Node is bootstrap node"
+time=2024-02-16T15:53:49.885+02:00 level=INFO msg="Genesis block created"
+time=2024-02-16T15:53:49.886+02:00 level=INFO msg="Blockchain written successfully"
+time=2024-02-16T15:53:49.887+02:00 level=INFO msg="I'm an alone node :'("
+time=2024-02-16T15:53:49.887+02:00 level=INFO msg="Created post-transaction and post-block consumers"
+time=2024-02-16T15:53:49.907+02:00 level=INFO msg="Server listening" protocol=tcp socket=localhost:1500
+time=2024-02-16T15:54:03.406+02:00 level=INFO msg="PrintWallet RPC called"
+time=2024-02-16T15:54:08.818+02:00 level=INFO msg="Create_transaction RPC called"
+time=2024-02-16T15:54:09.839+02:00 level=INFO msg="Sent transaction" receiver=0 amount=100 message=""
+time=2024-02-16T15:54:09.843+02:00 level=INFO msg="Received new transaction" type=transfer from=0 to=0 amount=100 message="" nonce=1 tid=2aa4963fd1a35741f7d8ee49cd4abb6f9fedecc6dbb967d3c467362a3d12543c
+time=2024-02-16T15:54:09.843+02:00 level=INFO msg="Transaction added to database"

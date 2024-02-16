@@ -71,75 +71,75 @@ services:
       - C:\Users\ppapa\Desktop\go\cluster\node4:/tmp/blockchat
 
     
-  # node5:
-  #   image: blockchat
-  #   environment:
-  #     - NODE_ID=5
-  #     - INPUT_PATH=./input/trans5.txt
-  #   env_file:
-  #     - ./docker.env
-  #   networks:
-  #     - cluster
-  #   ports:
-  #     - "1505:1500"
-  #   # volumes:
-  #   #   - C:\Users\ppapa\Desktop\go\cluster\node5:/tmp/blockchat/
+  node5:
+    image: blockchat
+    environment:
+      - NODE_ID=5
+      - INPUT_PATH=./input/trans5.txt
+    env_file:
+      - ./docker.env
+    networks:
+      - cluster
+    ports:
+      - "1505:1500"
+    volumes:
+      - C:\Users\ppapa\Desktop\go\cluster\node5:/tmp/blockchat/
   
-  # node6:
-  #   image: blockchat
-  #   environment:
-  #     - NODE_ID=6
-  #     - INPUT_PATH=./input/trans6.txt
-  #   env_file:
-  #     - ./docker.env
-  #   networks:
-  #     - cluster
-  #   ports:
-  #     - "1506:1500"
-  #   # volumes:
-  #   #   - C:\Users\ppapa\Desktop\go\cluster\node6:/tmp/blockchat/
+  node6:
+    image: blockchat
+    environment:
+      - NODE_ID=6
+      - INPUT_PATH=./input/trans6.txt
+    env_file:
+      - ./docker.env
+    networks:
+      - cluster
+    ports:
+      - "1506:1500"
+    volumes:
+      - C:\Users\ppapa\Desktop\go\cluster\node6:/tmp/blockchat/
 
-  # node7:
-  #   image: blockchat
-  #   environment:
-  #     - NODE_ID=7
-  #     - INPUT_PATH=./input/trans7.txt
-  #   env_file:
-  #     - ./docker.env
-  #   networks:
-  #     - cluster
-  #   ports:
-  #     - "1507:1500"
-  #   # volumes:
-  #   #   - C:\Users\ppapa\Desktop\go\cluster\node7:/tmp/blockchat/
+  node7:
+    image: blockchat
+    environment:
+      - NODE_ID=7
+      - INPUT_PATH=./input/trans7.txt
+    env_file:
+      - ./docker.env
+    networks:
+      - cluster
+    ports:
+      - "1507:1500"
+    volumes:
+      - C:\Users\ppapa\Desktop\go\cluster\node7:/tmp/blockchat/
 
-  # node8:
-  #   image: blockchat
-  #   environment:
-  #     - NODE_ID=8
-  #     - INPUT_PATH=./input/trans8.txt
-  #   env_file:
-  #     - ./docker.env
-  #   networks:
-  #     - cluster
-  #   ports:
-  #     - "1508:1500"
-  #   # volumes:
-  #   #   - C:\Users\ppapa\Desktop\go\cluster\node8:/tmp/blockchat/
+  node8:
+    image: blockchat
+    environment:
+      - NODE_ID=8
+      - INPUT_PATH=./input/trans8.txt
+    env_file:
+      - ./docker.env
+    networks:
+      - cluster
+    ports:
+      - "1508:1500"
+    volumes:
+      - C:\Users\ppapa\Desktop\go\cluster\node8:/tmp/blockchat/
 
-  # node9:
-  #   image: blockchat
-  #   environment:
-  #     - NODE_ID=9
-  #     - INPUT_PATH=./input/trans9.txt
-  #   env_file:
-  #     - ./docker.env
-  #   networks:
-  #     - cluster
-  #   ports:
-  #     - "1509:1500"
-  #   # volumes:
-  #   #   - C:\Users\ppapa\Desktop\go\cluster\node9:/tmp/blockchat/
+  node9:
+    image: blockchat
+    environment:
+      - NODE_ID=9
+      - INPUT_PATH=./input/trans9.txt
+    env_file:
+      - ./docker.env
+    networks:
+      - cluster
+    ports:
+      - "1509:1500"
+    volumes:
+      - C:\Users\ppapa\Desktop\go\cluster\node9:/tmp/blockchat/
 
 networks:
   cluster:

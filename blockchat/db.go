@@ -227,7 +227,7 @@ func (db *Database) addBlock(_block *Block, _adressMap *map[string]int) {
 				logger.Error("Could not add transaction from block", "error", err)
 			}
 		}
-		fee = +db.addTransaction(&tx, senderId, receiverId)
+		fee = fee + db.addTransaction(&tx, senderId, receiverId)
 
 	}
 	// Credit the validator, the fees
