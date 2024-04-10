@@ -120,6 +120,24 @@ func (p *RPC) GetNonce(_ struct{}, reply *uint) error {
 	return nil
 }
 
+func (p *RPC) ViewBlock(_ struct{}, reply *Block) error {
+	logger.Info("ViewBlock RPC called")
+	length := len(p.node.blockchain)
+	if (length >0 ) {
+		*reply = p.node.blockchain[length-1]
+	} else {
+		*reply = Block{}
+	}
+	
+	return nil
+}
+
+func (p *RPC) ViewDatabase(_ struct{}, reply *Database) error {
+	logger.Info("ViewDatabase RPC called")
+	*reply = p.node.myDB
+	
+	return nil
+}
 // Function to start and expose RPC service to defined socket
 // Protocols: unix, tcp, udp, tcp4, tcp6
 // Sockets: address:port in the case of internet protocols

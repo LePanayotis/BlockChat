@@ -27,3 +27,4 @@ go.sum
 input/
 cluster/
 ELK/
+blockchat.linux.x64

@@ -3,12 +3,15 @@ package blockchat
 import (
 	"bufio"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"net/rpc"
 	"os"
 	"strconv"
 	"strings"
+
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 )
 
 // CLI command to create new transaction via RPC
@@ -158,6 +161,73 @@ var printWalletCmd = &cobra.Command{
 	},
 }
 
+var viewBlockCmd = &cobra.Command{
+	Use:   "view",
+	Short: "Prints the transactions contained in the last validated block",
+	Run: func(_cmd *cobra.Command, _args []string) {
+		// Dials socket
+		protocol, _ := _cmd.Flags().GetString("protocol")
+		socket, _ := _cmd.Flags().GetString("socket")
+		client, err := rpc.Dial(protocol, socket)
+		if err != nil {
+			fmt.Println("Error connecting to server:", err)
+			return
+		}
+		defer client.Close()
+
+		// Gets block
+		var reply Block
+		err = client.Call("RPC.ViewBlock", struct{}{}, &reply)
+		if err != nil {
+			fmt.Println("Error executing command:", err)
+			return
+		}
+		formattedJSON, err := json.MarshalIndent(reply, "", "    ")
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		fmt.Println(string(formattedJSON))
+
+	},
+}
+
+var viewDBCmd = &cobra.Command{
+	Use:   "view-db",
+	Short: "Prints the wallets of all nodes",
+	Run: func(_cmd *cobra.Command, _args []string) {
+		// Dials socket
+		protocol, _ := _cmd.Flags().GetString("protocol")
+		socket, _ := _cmd.Flags().GetString("socket")
+		client, err := rpc.Dial(protocol, socket)
+		if err != nil {
+			fmt.Println("Error connecting to server:", err)
+			return
+		}
+		defer client.Close()
+
+		// Gets block
+		var reply Database
+		err = client.Call("RPC.ViewDatabase", struct{}{}, &reply)
+		if err != nil {
+			fmt.Println("Error executing command:", err)
+			return
+		}
+		keys := maps.Keys(reply)
+		for _, k := range keys {
+			fmt.Printf("Node %v: %v BCCs\n", k, reply[k].Balance)
+		}
+
+		// formattedJSON, err := json.MarshalIndent(reply, "", "    ")
+		// if err != nil {
+		// 	fmt.Println("Error:", err)
+		// 	return
+		// }
+		// fmt.Println(string(formattedJSON))
+
+	},
+}
+
 var stakeCmd = &cobra.Command{
 	Use:     "stake",
 	Aliases: []string{"s"},
@@ -273,6 +343,8 @@ func ConfigCommands() *cobra.Command {
 		transactionCmd,
 		printWalletCmd,
 		getNonce,
+		viewBlockCmd,
+		viewDBCmd,
 	}
 
 	// Defaults are the one specified in the environment
@@ -284,7 +356,6 @@ func ConfigCommands() *cobra.Command {
 	startCmd.Flags().IntP("nodes", "N", tempConfig.nodes, "The number of nodes")
 	startCmd.Flags().BoolP("cli", "i", tempConfig.useCLI, "If present, logs are silenced and interactive CLI activates")
 	startCmd.Flags().StringP("input-path", "f", tempConfig.inputPath, "Sets the input file of transactions")
-	startCmd.Flags().StringP("log-path", "l", tempConfig.logPath, "Redirects stderr to this file")
 
 	startCmd.MarkFlagFilename("input-path")
 	startCmd.MarkFlagFilename("blockchain-path")

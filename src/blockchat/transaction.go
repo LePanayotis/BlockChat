@@ -24,14 +24,14 @@ import (
 // as defined in GetConcat method.
 // `Signature` is the encrypted `Id` with the private key of the sender
 type Transaction struct {
-	Sender    string  `json:"s"`
-	Receiver  string  `json:"r"`
-	Type      string  `json:"t"`
-	Amount    float64 `json:"a"`
-	Message   string  `json:"m"`
-	Nonce     uint    `json:"n"`
-	Id        string  `json:"i"`
-	Signature string  `json:"sg"`
+	Sender    string  `json:"sender"`
+	Receiver  string  `json:"receiver"`
+	Type      string  `json:"type"`
+	Amount    float64 `json:"amount"`
+	Message   string  `json:"message"`
+	Nonce     uint    `json:"nonce"`
+	Id        string  `json:"id"`
+	Signature string  `json:"sig"`
 }
 
 // Creates a new message transaction instance

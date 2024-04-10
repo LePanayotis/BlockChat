@@ -16,7 +16,7 @@ type nodeConfig struct {
 	blockchainPath string // The path where the blockchain json representation is stored, can be absolute or relative
 	dbPath         string // The path where the database json representation is stored, can be absolute or relative
 	inputPath      string // The path where the transactions input is stored, can be absolute or relative
-	logPath string // The path where the
+	//logPath string // The path where the
 	defaultStake float64
 
 	id       int            // Node id varying from 0 to nodes-1 (number of nodes in cluster-1)
@@ -96,10 +96,6 @@ func (node *nodeConfig) EnvironmentConfig() error {
 	v, found = os.LookupEnv("INPUT_PATH")
 	if found && v != "" {
 		node.inputPath = v
-	}
-	v, found = os.LookupEnv("LOG_PATH")
-	if found && v != "" {
-		node.logPath = v
 	}
 	v, found = os.LookupEnv("CAPACITY")
 	if found && v != "" {
