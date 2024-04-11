@@ -43,7 +43,7 @@ var transactionCmd = &cobra.Command{
 				fmt.Println("Error parsing amount", err)
 				return
 			}
-		} else {
+		} else if !isMessage {
 			// Case _args length is not 2
 			fmt.Println("Provide receiver node id and amount")
 			return

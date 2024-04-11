@@ -26,5 +26,6 @@ go.sum
 *.json
 input/
 cluster/
+scripts/
 ELK/
 blockchat.linux.x64
